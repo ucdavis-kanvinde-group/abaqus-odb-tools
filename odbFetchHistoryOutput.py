@@ -67,6 +67,7 @@ def saveContourDataCSV(odbName, description, runCompletion,
 
     #end program
     saveFile.close()
+    return None
 
 def getJintegral(odbName, stepName):
     """ 
@@ -138,6 +139,8 @@ def getJintegral(odbName, stepName):
     #
     saveContourDataCSV(odbName, description, runCompletion,
                        contourLabels, contourNumbers, dataSet)
+    return None
+
     
             
     

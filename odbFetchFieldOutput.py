@@ -129,6 +129,7 @@ def saveOdbFieldDataCSV(odbName, nodeSetName, dataName,
 
     #end program
     saveFile.close()
+    return None
 
 def getNodalPEEQ(odbName, nodeSetName):
     """ Returns a CSV of the nodal averaged PEEQ"""
@@ -572,6 +573,7 @@ def getNodalCoords(odbName, nodeSetName):
     for i in range(0,numdim):
         saveOdbFieldDataCSV(odbName, nodeSetName, components[i],
                        runCompletion, nodeLabels, resultCOORD[:,:,i])
+    return None
 
 def getNodalReaction(odbName, nodeSetName):
     """
@@ -686,3 +688,4 @@ def getNodalReaction(odbName, nodeSetName):
     for i in range(0,numdim):
         saveOdbFieldDataCSV(odbName, nodeSetName, components[i],
                        runCompletion, nodeLabels, resultRF[:,:,i])
+    return None
