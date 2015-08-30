@@ -68,22 +68,32 @@ def saveContourDataCSV(odbName, description, runCompletion,
     #end program
     saveFile.close()
     return None
-
-def getJintegral(odbName, stepName):
+    
+def getJintegral(odbName, stepName, crackName, converted=False):
     """ 
     Returns a CSV of the J contour integrals 
     for the desired step 
+    
+    'converted' optional input argument is currently a hack
+    for ODB conversion work-around
     """
     
     #open the output database. must be in same directory
-    #(it is recommended to use a copy in a subdirectory)
     odb = openOdb(odbName,readOnly=True)
     
     #define description string (per ABAQUS)
     description = 'J-integral'
     
+    #ensure that the crackName is uppercase (per ABAQUS)
+    crackName.upper()
+    
     #define history region to analyse
-    region_history = odb.steps['Pull'].historyRegions['ElementSet . ALL ELEMENTS'].historyOutputs
+    if converted:
+        histKey = 'ElementSet . PIBATCH'
+    else:
+        histKey = 'ElementSet . ALL ELEMENTS'
+    
+    region_history = odb.steps[stepName].historyRegions[histKey].historyOutputs
     
     #
     # obtain all of the relevant FRAME values
@@ -103,8 +113,9 @@ def getJintegral(odbName, stepName):
     #
     numcontours = int(0)
     for key in region_history.keys():
-        if description in region_history[key].description:
-            #implies this key is a J-integral
+        if (description in region_history[key].description) and \
+           (crackName   in region_history[key].name):
+            #implies this key is a J-integral of the requested crack
             numcontours += 1
             
     #
@@ -118,8 +129,9 @@ def getJintegral(odbName, stepName):
     dataSet = numpy.zeros((numframes,numcontours),dtype=numpy.float64)
     
     for key in region_history.keys():
-        if description in region_history[key].description:
-            #implies this key is a J-integral
+        if (description in region_history[key].description) and \
+           (crackName   in region_history[key].name):
+            #implies this key is a J-integral of the requested crack
             contourIndex += 1
             
             #save contour name and number
@@ -137,10 +149,9 @@ def getJintegral(odbName, stepName):
     #
     # save output
     #
+    description = description + crackName
     saveContourDataCSV(odbName, description, runCompletion,
                        contourLabels, contourNumbers, dataSet)
     return None
-
-    
             
     
