@@ -16,14 +16,26 @@ sys.path.append("C:\\Python27\\Lib\\site-packages")
 from send2trash import send2trash
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def check_delete(name):
-    """ deletes old file, if it exists """
-    try:
-        send2trash(name)
-        print "\nold file sent to recycle bin"
-        print "saving new \"%s\"\n" % (name)
-    except:
-        print "\nno file found, saving new file \"%s\"\n" % (name)
+def check_delete(name, verbose=True):
+    """ 
+    deletes old file, if it exists 
+    input: 
+        name    = file name, with extension (must be in current working dir)
+        verbose = optional input (default=True) which will print messages
+                  to the command window
+    """
+    if verbose:
+        try:
+            send2trash(name)
+            print "\nold file sent to recycle bin"
+            print "saving new \"%s\"\n" % (name)
+        except:
+            print "\nno file found, saving new file \"%s\"\n" % (name)
+    else:
+        try:
+            send2trash(name)
+        except:
+            pass
 
 
 def safe_filename(name):
