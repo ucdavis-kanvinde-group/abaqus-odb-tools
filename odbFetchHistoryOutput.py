@@ -85,7 +85,7 @@ def getJintegral(odbName, stepName, crackName, converted=False):
     description = 'J-integral'
     
     #ensure that the crackName is uppercase (per ABAQUS)
-    crackName.upper()
+    crackName = crackName.upper()
     
     #define history region to analyse
     if converted:
