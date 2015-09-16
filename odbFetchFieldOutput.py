@@ -177,6 +177,9 @@ def getNodalPEEQ(odbName, nodeSetName, verbose=True):
     #define keyName string (per ABAQUS) where desired data is stored
     keyName = 'PEEQ'
     
+    #ensure that the nodeSetName is uppercase (per ABAQUS)
+    nodeSetName = nodeSetName.upper()
+    
     #
     # check if keyName and nodeSetName exist (Error Handling):
     #
@@ -291,6 +294,9 @@ def getNodalMises(odbName, nodeSetName, verbose=True):
     #define keyName string (per ABAQUS) where desired data is stored
     #mises is stored in the stress output: 'S'
     keyName = 'S'
+    
+    #ensure that the nodeSetName is uppercase (per ABAQUS)
+    nodeSetName = nodeSetName.upper()
     
     #
     # check if dataName and nodeSetName exist (Error Handling):
@@ -407,6 +413,9 @@ def getNodalPressure(odbName, nodeSetName, verbose=True):
     #pressure is stored in the stress output: 'S'
     keyName = 'S'
     
+    #ensure that the nodeSetName is uppercase (per ABAQUS)
+    nodeSetName = nodeSetName.upper()
+    
     #
     # check if keyName and nodeSetName exist (Error Handling):
     #
@@ -521,6 +530,9 @@ def getNodalInv3(odbName, nodeSetName, verbose=True):
     #define keyName string (per ABAQUS) where desired data is stored
     #inv3 is stored in the stress output: 'S'
     keyName = 'S'
+    
+    #ensure that the nodeSetName is uppercase (per ABAQUS)
+    nodeSetName = nodeSetName.upper()
     
     #
     # check if dataName and nodeSetName exist (Error Handling):
@@ -637,6 +649,9 @@ def getNodalCoords(odbName, nodeSetName, verbose=True):
     keyName = 'COORD'
     
     #dataName will be defined per ABAQUS componentLabels.
+    
+    #ensure that the nodeSetName is uppercase (per ABAQUS)
+    nodeSetName = nodeSetName.upper()
     
     #
     # check if keyName and nodeSetName exist (Error Handling):
@@ -760,6 +775,9 @@ def getNodalDispl(odbName, nodeSetName, verbose=True):
     
     #dataName will be defined per ABAQUS componentLabels
     
+    #ensure that the nodeSetName is uppercase (per ABAQUS)
+    nodeSetName = nodeSetName.upper()
+    
     #
     # check if keyName and nodeSetName exist (Error Handling):
     #
@@ -882,6 +900,9 @@ def getNodalReaction(odbName, nodeSetName, verbose=True):
     
     #dataName will be defined per ABAQUS componentLabels
     
+    #ensure that the nodeSetName is uppercase (per ABAQUS)
+    nodeSetName = nodeSetName.upper()
+    
     #
     # check if keyName and nodeSetName exist (Error Handling):
     #
@@ -1003,6 +1024,9 @@ def getNodalReactionSum(odbName, nodeSetName, verbose=True):
     keyName = 'RF'
     
     #dataName will be defined per ABAQUS componentLabels
+    
+    #ensure that the nodeSetName is uppercase (per ABAQUS)
+    nodeSetName = nodeSetName.upper()
     
     #
     # check if keyName and nodeSetName exist (Error Handling):
