@@ -43,50 +43,48 @@ class IntPtVariable(object):
         self.runCompletion = None
         self.nodeLabels    = None
         self.resultData    = None
-        
-        # these are set by @property setters and getters,
-        # because this is dependent on ABAQUS ODB object structure.
-        # see the below if-elif ladder for more info.
-        self.__keyName   = None
-        self.__abqAttrib = None
-                
-
+                       
     #
-    # Getters and Setters
+    # Dependent Properties (set depending on dataName)
     #
     @property
     def keyName(self):
         """ 
-		keyName property. 
-		This is the "main" output variable in Abaqus that you are
-		looking for. For example, if you want MISES data, the 
-		"main" output variable is actually stress, which has a 
-		keyName of 'S' in the output.
-		"""
-        return self.__keyName
-    
-    @keyName.setter
-    def keyName(self):
-        """ set keyName property based on ABAQUS object structure """
-        if self.dataName == 'PEEQ'
-            self.__keyName = 'PEEQ'
+        keyName property. 
+        This is the "main" output variable in Abaqus that you are
+        looking for. For example, if you want MISES data, the 
+        "main" output variable is actually stress, which has a 
+        keyName of 'S' in the output.
+        """
+        if self.dataName == 'PEEQ':
+            return 'PEEQ'
+        elif: self.dataName == 'MISES':
+            return 'S'
+        elif: self.dataName == 'PRESS':
+            return 'S'
+        elif: self.dataName == 'INV3':
+            return 'S'
+        else:
+            raise Exception('dataName')
     
     @property
     def abqAttrib(self):
         """ 
-		Abaqus Attribute property... this is the name of the
-		location where our field output data values are stored
-		in the abaqus ODB structure
-		"""
-        return self.__abqAttrib
+        Abaqus Attribute property... this is the name of the
+        location where our field output data values are stored
+        in the abaqus ODB structure
+        """
+        if self.dataName == 'PEEQ':
+            return 'data'
+        elif: self.dataName == 'MISES':
+            return 'mises'
+        elif: self.dataName == 'PRESS':
+            return 'press'
+        elif: self.dataName == 'INV3':
+            return 'inv3'
+        else:
+            raise Exception('dataName')
 
-    @abqAttrib.setter
-    def abqAttrib(self):
-	""" set attribute property name based on ABAQUS object structure """
-        if self.dataName == 'PEEQ'
-            self.__abqAttrib = 'data'
-            
-    
     #
     # Methods
     #
@@ -107,7 +105,10 @@ class IntPtVariable(object):
         """
         
         #open the output database in read-only mode
-        odb = openOdb(self.odbName, readOnly=True)
+        if self.odbName.endswith('.odb'):
+            odb = openOdb(self.odbName, readOnly=True)
+        else:
+            odb = openOdb(self.odbName + '.odb', readOnly=True)
 
         #
         # check if keyName and nodeSetName exist (Error Handling)
