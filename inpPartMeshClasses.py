@@ -37,6 +37,10 @@ class PartMesh(object):
         ElemConnect = numpy array of the nodal connectivity for an element
                       (e.g. ElemConnect[0] is the connectivity of element 1)
         ElemType    = string of the type of element (e.g. 'CAX8R')
+        
+    Methods:
+        fetchMesh()
+        saveCSV()
     """
     
     def __init__(self, inpPath, partName):
@@ -205,14 +209,17 @@ class PartMesh(object):
             saveDir = os.path.dirname(self.inpFileName)
             if saveDir is "":
                 saveDir = os.getcwd()
+            saveDir += '\\'
+        elif saveDir[-2:] != '\\':
+            saveDir += '\\'
         
         #
         # open files for writing
         #
         
-        # name of input file
+        # name of input file, excl. extension
         inpName = os.path.basename(self.inpPath)
-        inpName = os.path.splittext(self.inpPath)
+        inpName = os.path.splitext(inpName)[0]
         
         # create file handles
         dummy = saveDir + inpName + '_' + self.partName + '_nodesCoords.csv'
@@ -230,17 +237,21 @@ class PartMesh(object):
         elemFile.close()
         return
         
-    def __saveArrayCSV(self, fhandle, array)
-        """ writes any array to CSV, given a file handle """
+    def __saveArrayCSV(self, fhandle, array):
+        """ 
+        writes array to CSV, given a file handle 
+        written for node and elemConnect arrays...
+        because CSV rows are prepended with their # (i.e. node # or element #)
+        """
         
         #determine shape of array
         nrow,ncol = array.shape
         
         for row in range(0,nrow):
             #start a new line
-            line = str(row)
+            line = str(row+1)
             for col in range(0,ncol):
-                line += ', ' + array[row,col]
+                line += ', ' + str(array[row,col])
             #end of line, write to file
             line += '\n'
             fhandle.write(line)
