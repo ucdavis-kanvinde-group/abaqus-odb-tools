@@ -3,9 +3,18 @@ Vincente Pericoli
 UC Davis
 16 Sept 2015
 
-Classes for the odbFetchFieldOutput library.
-This is where all the juicy stuff is.
+Classes for representing Abaqus ODB field variables.
+
+Contained in this file:
+    * fieldVariable class: superclass which the others inherit
+    * IntPtVariable class: represents an integration point variable (e.g. Mises, PEEQ, etc.)
+    * NodalVariable class: represents a nodal variable (e.g. U, COORD, etc.)
+    * ElementVariable class: represents an element variable (e.g. EVOL)
 """
+
+#
+# Import Modules
+#
 from odbAccess import *
 from abaqusConstants import *
 import numpy
@@ -13,6 +22,10 @@ import sys
 import re
 import os
 from myFileOperations import *
+
+#
+# Classes
+#
 
 class fieldVariable(object):
     """ a base class for field variables; other classes inherit this class. """
@@ -246,7 +259,7 @@ class IntPtVariable(fieldVariable):
         elif self.dataName == 'INV3':
             return 'S'
         else:
-            raise Exception('Unknown dataName assignment!')
+            raise Exception('That dataName has not been programmed! (yet?)')
         return
     
     @property
@@ -265,7 +278,7 @@ class IntPtVariable(fieldVariable):
         elif self.dataName == 'INV3':
             return 'inv3'
         else:
-            raise Exception('Unknown dataName assignment!')
+            raise Exception('That dataName has not been programmed! (yet?)')
         return
 
     #

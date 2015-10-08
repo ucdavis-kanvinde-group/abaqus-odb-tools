@@ -1,14 +1,18 @@
 """
 Vincente Pericoli
-14 July 2015
 UC Davis
+09/17/2015
 
+Classes for representing Abaqus ODB history variables.
+
+Contained in this file:
+    * CrackVariable class: represents a crack variable (e.g. J-integral)
 """
 
 
 #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Import Modules
+#
 
 from odbAccess import *
 from abaqusConstants import *
@@ -19,8 +23,9 @@ import string
 from myFileOperations import *
 
 #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Define Class
+# Classes
+#
+
 class CrackVariable(object):
     """ a crack variable (currently only J-integral supported)
     

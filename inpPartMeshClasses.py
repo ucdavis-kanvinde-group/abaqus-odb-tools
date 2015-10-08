@@ -3,8 +3,8 @@ Vincente Pericoli
 UC Davis
 9/28/15
 
-File that contains a class for retrieving mesh information
-from Abaqus input files
+File that contains a class for representing/retrieving 
+mesh information from Abaqus input files
 """
 
 #
@@ -27,7 +27,8 @@ class PartMesh(object):
                    if a full path, must be in the form of 'C:\\folder\\...\\file.inp'
         partName = string name of the part you want the mesh for.
                    you will encounter a serious bug if other parts contain exactly this part name 
-                   (e.g. if you want 'part1' but there is also a part named 'part11')
+                   (e.g. if you want 'part1' but there is also a part named 'part11').
+                   This is also a "feature" of sorts, because you can use partial matching.
 
     Attributes set by fetchMesh():
         Nodes       = numpy array vector of all node numbers
