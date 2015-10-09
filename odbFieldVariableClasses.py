@@ -150,17 +150,21 @@ class fieldVariable(object):
             labels = self.nodeLabels
             #we want to write in the file that it is node labels
             line1 = '"node (right):"'
+            #we want to write this to the filename, so there won't be conflicts
+            type = 'ELEM'
         elif self.nodeLabels is None:
             labels = self.elementLabels
             #we want to write in the file that it is element labels
             line1 = '"element (right):"'
+            #we want to write this to the filename, so there won't be conflicts
+            type = 'NODE'
         else:
             raise Exception("Labels are undefined!")
         
         #strip away file extension
         odbName = os.path.splitext(self.odbName)[0]
         #assign file name to save
-        saveFileName = (odbName + '_' + self.setName
+        saveFileName = (odbName + '_' + self.setName + '-' + type +
                         + '_' + dataTitle + '.csv')
         #ensure filename is safe to write
         saveFileName = safe_filename(saveFileName)
@@ -284,7 +288,7 @@ class IntPtVariable(fieldVariable):
     #
     # Methods
     #
-    def fetchNodalOutput(self):
+    def fetchNodalAverage(self):
         """ fetch the integration point field output
         for the desired node set. Since we are requesting IP
         field output at the nodes, ABAQUS will extrapolate 
@@ -710,7 +714,7 @@ class NodalVariable(fieldVariable):
         self._componentLabels = components
         return
 
-    def sumNodalData(self):
+    def sumNodalOutput(self):
         """ 
         sums the data across all nodes (but not frames).
         This is useful, for example, if you wish to get the
