@@ -40,7 +40,7 @@ class fieldVariable(object):
         self._dataName = dataName.upper() # must be upper-case
         self._setName  = setName.upper()  # must be upper-case
 
-        # these are set by fetchNodalOutput()
+        # these are set by fetchNodalAverage()
         self._runCompletion = None
         self._nodeLabels    = None
         self._elementLabels = None
@@ -56,11 +56,11 @@ class fieldVariable(object):
     
     @property
     def nodeLabels(self):
-        return self._nodeLabels
+        return tuple(self._nodeLabels)
     
     @property
     def elementLabels(self):
-        return self._elementLabels
+        return tuple(self._elementLabels)
 
     @property
     def resultData(self):
@@ -77,7 +77,7 @@ class fieldVariable(object):
     def odbName(self,s):
         if not isinstance(s,str):
             raise TypeError('Must be a string!')
-        self.__odbName = s
+        self._odbName = s
         #changing this attribute will invalidate any field data
         self.reset()
         return
@@ -224,7 +224,7 @@ class IntPtVariable(fieldVariable):
         abqAttrib = string name of data storage location
                     depends on setting of dataName
         
-    Attributes set by fetchNodalOutput():
+    Attributes set by fetchNodalAverage():
         runCompletion = list of frame values for abaqus run 
                         runCompletion[0] corresponds to resultData[0,:], etc.
         nodeLabels    = list of nodes where output is generated
@@ -317,8 +317,8 @@ class IntPtVariable(fieldVariable):
         try:
             myNodeSet = odb.rootAssembly.nodeSets[self.setName]
         except KeyError:
-            print 'Assembly level node set named %s does' \
-                  'not exist in the output database %s' \
+            print '\n!! Assembly level node set named %s does' \
+                  'not exist in the output database %s !!\n\n' \
                   % (self.setName, self.odbName)
             odb.close()
             raise Exception
@@ -440,8 +440,8 @@ class IntPtVariable(fieldVariable):
         try:
             myElemSet = odb.rootAssembly.elementSets[self.setName]
         except KeyError:
-            print 'Assembly level element set named %s does' \
-                  'not exist in the output database %s' \
+            print '\n!! Assembly level element set named %s does' \
+                  'not exist in the output database %s !!\n\n' \
                   % (self.setName, self.odbName)
             odb.close()
             raise Exception
@@ -555,7 +555,7 @@ class NodalVariable(fieldVariable):
         dataName = string name of the data (e.g. 'U')
         setName = string of the requested node set
     
-    Attributes set by fetchNodalOutput():
+    Attributes set by fetchNodalAverage():
         runCompletion = list of frame values for abaqus run 
                         runCompletion[0] corresponds to resultData[0,:,:], etc.
         nodeLabels    = list of nodes where output is generated
@@ -609,8 +609,8 @@ class NodalVariable(fieldVariable):
         try:
             myNodeSet = odb.rootAssembly.nodeSets[self.setName]
         except KeyError:
-            print 'Assembly level node set named %s does' \
-                  'not exist in the output database %s' \
+            print '\n!! Assembly level node set named %s does' \
+                  'not exist in the output database %s !!\n\n' \
                   % (self.setName, self.odbName)
             odb.close()
             raise KeyError
@@ -786,8 +786,8 @@ class ElementVariable(fieldVariable):
         try:
             myElemSet = odb.rootAssembly.elementSets[self.setName]
         except KeyError:
-            print 'Assembly level element set named %s does' \
-                  'not exist in the output database %s' \
+            print '\n!! Assembly level element set named %s does' \
+                  'not exist in the output database %s !!\n\n' \
                   % (self.setName, self.odbName)
             odb.close()
             raise Exception

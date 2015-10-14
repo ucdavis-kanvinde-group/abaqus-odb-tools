@@ -3,14 +3,13 @@ Vincente Pericoli
 14 July 2015
 UC Davis
 
-Set of common file operations
+Set of common (Windows) file operations
 """
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 import re
-import sys
 import os
-sys.path.append("C:\\Python27\\Lib\\site-packages")
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def check_delete(name, verbose=True):
@@ -49,7 +48,7 @@ def check_recycle(name, verbose=True):
     # it's bad practice to import within a function, but the use of
     # check_recycle is optional, since check_delete exists. Thus, I don't
     # want the import of myFileOperations to break simply because someone
-    # does not have the optional send2trash module installed.
+    # does not have the optional send2trash module installed...
     from send2trash import send2trash
     
     if verbose:

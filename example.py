@@ -50,5 +50,6 @@ peeq.saveCSV()
 #     functions.
 #   * nodal variables work similarly, but their method is called
 #     fetchNodalOutput(), because they are not discontinuous...
+#     (no average needed)
 #   * this example file is just a start! read the doc strings of the classes
 #     for more detailed information.
