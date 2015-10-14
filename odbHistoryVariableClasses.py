@@ -1,12 +1,11 @@
 """
 Vincente Pericoli
 UC Davis
-09/17/2015
+10/08/2015
 
 Classes for representing Abaqus ODB history variables.
 
-Contained in this file:
-    * CrackVariable class: represents a crack variable (e.g. J-integral)
+verified to give accurate results on 10/14/2015
 """
 
 
@@ -27,7 +26,8 @@ from myFileOperations import *
 #
 
 class CrackVariable(object):
-    """ a crack variable (currently only J-integral supported)
+    """ 
+    a crack variable (currently only J-integral supported)
     
     Attributes:
     
@@ -45,76 +45,103 @@ class CrackVariable(object):
         
         # these attributes have properties (below) to protect the 
         # object from becoming unstable or broken
-        self.__odbName   = odbName
-        self.__stepName  = stepName
-        self.__crackName = crackName.upper()
+        self._odbName   = odbName
+        self._stepName  = stepName
+        self._crackName = crackName.upper()
     
-        # these are set by getJintegral()
-        self.description    = None
-        self.runCompletion  = None
-        self.contourLabels  = None
-        self.contourNumbers = None
-        self.resultData     = None
+        # these are set by getJintegral().
+        # they are also pseudo-private because we don't want
+        # to accidentally modify the data when we use it.
+        self._description    = None
+        self._runCompletion  = None
+        self._contourLabels  = None
+        self._contourNumbers = None
+        self._resultData     = None
         return
         
     #
-    # Getters and Setters
+    # Getters and Setters for definition
     #
     @property
     def odbName(self):
-        return self.__odbName
+        return self._odbName
     
     @odbName.setter
     def odbName(self,s):
         if not isinstance(s,str):
             raise TypeError('Must be a string!')
-        self.__odbName = s
-        #changing the odbName will reset results since 
-        #they are not valid for a new ODB
+        self._odbName = s
+        #changing the odbName will reset any results  
+        #since they are not valid for a new ODB
         self.reset()
         return
 
     @property
     def stepName(self):
-        return self.__stepName
+        return self._stepName
     
     @stepName.setter
     def stepName(self,s):
         if not isinstance(s,str):
             raise TypeError('Must be a string!')
-        self.__odbName = s
-        #changing the odbName will reset results since 
-        #they are not valid for a new ODB
+        self._stepName = s
+        #changing the stepName will reset any results
+        #since they are not valid for a new step
         self.reset()
         return
 
     @property
     def crackName(self):
-        return self.__crackName
+        return self._crackName
         
     @crackName.setter
     def crackName(self,s):
         # must be uppercase. don't need to explicitly 
         # check if string, since upper() only valid for strings
-        self.__crackName = s.upper()
+        self._crackName = s.upper()
         self.reset()
         return
-
+    
+    #
+    # Getters for data
+    #
+    
+    @property
+    def description(self):
+        return self._description
+        
+    @property
+    def runCompletion(self):
+        return self._runCompletion
+        
+    @property
+    def contourLabels(self):
+        return self._contourLabels
+        
+    @property
+    def contourNumbers(self):
+        return self._contourNumbers
+        
+    @property
+    def resultData(self):
+        return self._resultData
+    
+    
     #
     # Methods
     #
     
     def reset(self):
         """ resets any results to None """
-        self.description    = None
-        self.runCompletion  = None
-        self.contourLabels  = None
-        self.contourNumbers = None
-        self.resultData     = None
+        self._description    = None
+        self._runCompletion  = None
+        self._contourLabels  = None
+        self._contourNumbers = None
+        self._resultData     = None
         return
 
     
-    def getJintegral(self):
+    def fetchJintegral(self):
         """ obtains the J-integral values for the crack """
         
         #open the output database. must be in same directory
@@ -126,9 +153,11 @@ class CrackVariable(object):
         #define history region to analyze. kind of a hack-ey work-around 
         #for if the ODB has been converted from a previous ABAQUS version
         try:
+            # this is the histKey for a converted database
             histKey = 'ElementSet . PIBATCH'
             region_history = odb.steps[self.stepName].historyRegions[histKey].historyOutputs
         except:
+            # this is the default histKey for CAE 6.14
             histKey = 'ElementSet . ALL ELEMENTS'
             region_history = odb.steps[self.stepName].historyRegions[histKey].historyOutputs
         
@@ -182,11 +211,11 @@ class CrackVariable(object):
                     resultData[i,contourIndex] = data[i][1]
 
         # all relevant data for the step has been captured!
-        self.description    = description
-        self.runCompletion  = runCompletion
-        self.contourLabels  = contourLabels
-        self.contourNumbers = contourNumbers
-        self.resultData     = resultData
+        self._description    = description
+        self._runCompletion  = runCompletion
+        self._contourLabels  = contourLabels
+        self._contourNumbers = contourNumbers
+        self._resultData     = resultData
         return
         
     def saveCSV(self):
