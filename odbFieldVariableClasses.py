@@ -337,6 +337,7 @@ class IntPtVariable(fieldVariable):
         for n in myNodeSet.nodes[0]:
             nodeLabels.append(n.label)
         nodeLabels.sort()
+        nodeLabels = tuple(nodeLabels)
         numnod = int(len(nodeLabels))
 
         #
@@ -407,9 +408,10 @@ class IntPtVariable(fieldVariable):
                 #save frame values to result
                 resultData[frameNumber,:] = frameData[:,1]
 
-        #set the proper attributes
-        self._runCompletion = runCompletion
-        self._nodeLabels    = nodeLabels
+        #save attributes
+        #save lists as tuple for memory efficiency
+        self._runCompletion = tuple(runCompletion)
+        self._nodeLabels    = nodeLabels #already tuple
         self._resultData    = resultData
         
         #all data from the steps and frames has been collected!
@@ -460,6 +462,7 @@ class IntPtVariable(fieldVariable):
         for e in myElemSet.elements[0]: #for some reason, this is a 1-element tuple...??
             elementLabels.append(e.label)
         elementLabels.sort()
+        elementLabels = tuple(elementLabels)
         numele = int(len(elementLabels))
 
         #
@@ -530,9 +533,10 @@ class IntPtVariable(fieldVariable):
                 #save frame values to result
                 resultData[frameNumber,:] = frameData[:,1]
 
-        #set the proper attributes
-        self._runCompletion = runCompletion
-        self._elementLabels = elementLabels
+        #save data
+        #save lists as tuple for memory efficiency
+        self._runCompletion = tuple(runCompletion)
+        self._elementLabels = elementLabels #already tuple
         self._resultData    = resultData
         
         #all data from the steps and frames has been collected!
@@ -576,7 +580,7 @@ class NodalVariable(fieldVariable):
         # initialize field variable
         fieldVariable.__init__(self, odbName, dataName, setName)
         #add new attribute
-        self.__componentLabels = None
+        self._componentLabels = None
         
         return
     
@@ -589,7 +593,7 @@ class NodalVariable(fieldVariable):
 
     @property
     def componentLabels(self):
-        return self.__componentLabels
+        return self._componentLabels
     
     #
     # Methods
@@ -629,6 +633,7 @@ class NodalVariable(fieldVariable):
         #
         components = odb.steps[testStep].frames[0]. \
                      fieldOutputs[self.keyName].componentLabels
+        components = tuple(components)
         numdim = len(components)
         
         #
@@ -638,6 +643,7 @@ class NodalVariable(fieldVariable):
         for n in myNodeSet.nodes[0]:
             nodeLabels.append(n.label)
         nodeLabels.sort()
+        nodeLabels = tuple(nodeLabels)
         numnod = int(len(nodeLabels))
 
         #
@@ -707,10 +713,11 @@ class NodalVariable(fieldVariable):
         #close output database
         odb.close()
         
-        #save to self
-        self._runCompletion = runCompletion
-        self._nodeLabels    = nodeLabels
-        self._resultData    = resultData
+        # save to self
+        # save lists as tuples for memory efficiency
+        self._runCompletion   = tuple(runCompletion)
+        self._nodeLabels      = nodeLabels
+        self._resultData      = resultData
         self._componentLabels = components
         return
 
@@ -729,7 +736,6 @@ class NodalVariable(fieldVariable):
         for i in range(0,numdim):
             componentLabels.append('summed' + self.componentLabels[i])
         componentLabels = tuple(componentLabels)
-        self.componentLabels = componentLabels
         
         #initialize array
         resultData = numpy.zeros((numframes,1,numdim),dtype=numpy.float64)
@@ -741,8 +747,40 @@ class NodalVariable(fieldVariable):
                     resultData[frame,0,dim] += self.resultData[frame,n,dim]
         #save
         self._resultData = resultData
-        self._nodeLabels = [-1]
+        self._nodeLabels = (-1,)
+        self._componentLabels = componentLabels
         return
+        
+    def avgNodalOutput(self):
+        """
+        averages the data across all nodes (but not frames).
+        This is useful, for example, if you wish to get the
+        average displacement of a surface (node set)
+        """
+        #determine size of problem
+        numframes = len(self.runCompletion)
+        numdim    = len(self.componentLabels)
+        
+        #rename componentLabels to indicate they are summed
+        componentLabels = []
+        for i in range(0,numdim):
+            componentLabels.append('summed' + self.componentLabels[i])
+        componentLabels = tuple(componentLabels)
+        
+        #initialize array
+        resultData = numpy.zeros((numframes,1,numdim),dtype=numpy.float64)
+        
+        #perform the average
+        for dim in range(0,numdim):
+            for frame in range(0,numframes):
+                resultData[frame,0,dim] = numpy.mean( self.resultData[frame,:,dim] )
+
+        #save
+        self._resultData = resultData
+        self._nodeLabels = (-1,)
+        self._componentLabels = componentLabels
+        return
+        
 
     def saveCSV(self, verbose=True):
         """ save a CSV file of the data """
@@ -806,6 +844,7 @@ class ElementVariable(fieldVariable):
         for e in myElemSet.elements[0]: #for some reason, this is a 1-element tuple...
             elementLabels.append(e.label)
         elementLabels.sort()
+        elementLabels = tuple(elementLabels)
         numele = int(len(elementLabels))
 
         #
@@ -834,9 +873,10 @@ class ElementVariable(fieldVariable):
         resultData[0,:] = tempData
         
         #save to self
+        #save lists as tuple for memory efficiency
         self._elementLabels = elementLabels
         self._resultData    = resultData
-        self._runCompletion = (0,) #use tuple for memory efficiency
+        self._runCompletion = (0,)
         
         #close output database and return
         odb.close()
