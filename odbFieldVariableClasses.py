@@ -3,6 +3,10 @@ Vincente Pericoli
 UC Davis
 16 Sept 2015
 
+for README, license, and other info, see:
+https://github.com/ucdavis-kanvinde-group/abaqus-odb-tools
+
+
 Classes for representing Abaqus ODB field variables.
 
 Contained in this file:
@@ -32,18 +36,19 @@ class fieldVariable(object):
     #
     # Attributes (object initialization)
     #
-    def __init__(self, odbName, dataName, setName):
+    def __init__(self, odbPath, dataName, setName):
         """ return object with the desired attributes """
         # these attributes have properties (below) to protect the 
         # object from becoming unstable or broken
-        self._odbName  = odbName
+        self._odbPath  = odbPath
         self._dataName = dataName.upper() # must be upper-case
         self._setName  = setName.upper()  # must be upper-case
 
-        # these are set by fetchNodalAverage()
+        # these are set by methods
         self._runCompletion = None
         self._nodeLabels    = None
         self._elementLabels = None
+        self._intPtLabels   = None
         self._resultData    = None
         return
     
@@ -56,12 +61,16 @@ class fieldVariable(object):
     
     @property
     def nodeLabels(self):
-        return tuple(self._nodeLabels)
+        return self._nodeLabels
     
     @property
     def elementLabels(self):
-        return tuple(self._elementLabels)
+        return self._elementLabels
 
+    @property
+    def intPtLabels(self):
+        return self._intPtLabels
+        
     @property
     def resultData(self):
         return self._resultData
@@ -70,17 +79,22 @@ class fieldVariable(object):
     # Getters and Setters to protect Object
     #
     @property
-    def odbName(self):
-        return self._odbName
+    def odbPath(self):
+        return self._odbPath
     
-    @odbName.setter
-    def odbName(self,s):
+    @odbPath.setter
+    def odbPath(self,s):
         if not isinstance(s,str):
             raise TypeError('Must be a string!')
-        self._odbName = s
+        self._odbPath = s
         #changing this attribute will invalidate any field data
         self.reset()
         return
+
+    @property
+    def odbName(self):
+        """ returns odb file name (with file extensions) """
+        return self.odbPath.split('\\')[-1]
         
     @property
     def dataName(self):
@@ -88,7 +102,9 @@ class fieldVariable(object):
     
     @dataName.setter
     def dataName(self, s):
-        self._dataName = s.upper()
+        #call to upper() will automatically throw exception if not string
+        #so, no need to do error handling
+        self._dataName = s.upper() 
         #changing this attribute will invalidate any field data
         self.reset()
         return
@@ -99,6 +115,8 @@ class fieldVariable(object):
     
     @setName.setter
     def setName(self, s):
+        #call to upper() will automatically throw exception if not string
+        #so, no need to do error handling
         self._setName = s.upper()
         #changing this attribute will invalidate any field data
         self.reset()
@@ -113,8 +131,73 @@ class fieldVariable(object):
         self._runCompletion = None
         self._nodeLabels    = None
         self._elementLabels = None
+        self._intPtLabels   = None
         self._resultData    = None
         return
+    
+    def _open_odb_check_keys(self,setType):
+        """ 
+        opens ODB file, checks if a set of setType exists
+        in the assembly, and whether keyName is a defined
+        output quanitity.
+        
+        setType should be a string of 'NODE' or 'ELEMENT'
+        
+        returns [odb, mySet]
+        """
+    
+        #open the output database in read-only mode
+        if self.odbPath.endswith('.odb'):
+            odb = openOdb(self.odbPath, readOnly=True)
+        else:
+            odb = openOdb(self.odbPath + '.odb', readOnly=True)
+
+        
+        #
+        # check if setName exists, and open it
+        #
+        try:
+            #open the node or element set
+            if setType.upper() == 'NODE':
+                mySet = odb.rootAssembly.nodeSets[self.setName]
+            elif setType.upper() == 'ELEMENT':
+                mySet = odb.rootAssembly.elementSets[self.setName]
+            else:
+                print "\n\n!! unknown setType defined !!\n\n"
+                raise Exception
+        except KeyError:
+            #the requested set does not exist...
+            print '\n!! Assembly level %s set named %s does' \
+                  'not exist in the output database %s !!\n\n' \
+                    % (setType, self.setName, self.odbPath)
+            odb.close()
+            raise Exception
+        
+        #
+        # check if keyName is a requested output
+        #
+        testStep = odb.steps.keys()[-1]
+        if odb.steps[testStep].frames[-1].fieldOutputs.has_key(self.keyName) == 0:
+            print '%s output request is not defined for' \
+                  'all (or any?) steps!' % (self.keyName)
+            odb.close()
+            raise Exception
+        
+        return [odb, mySet]
+    
+    def _numframes(self, odb):
+        """
+        given an odb, loop through STEPs, obtaining
+        the total number of FRAMEs in the analysis
+        """
+
+        numframes = int(0)
+        #loop steps
+        for step in odb.steps.values():
+            #frames are the number of increments in a step
+            numframes += len(step.frames)
+        
+        return numframes
     
     def _saveOdbFieldDataCSV(self, dataTitle=None, 
                             dataSet=None, verbose=True):
@@ -144,28 +227,39 @@ class fieldVariable(object):
         if dataSet is None:
             dataSet = self.resultData
             
-        #determine if nodal or elemental data, and set which labels to write
-        if self.elementLabels is None:
+        #set which labels to write
+        if self.intPtLabels is not None:
+            #we want to write the element labels
+            #because the array contains data for
+            #all elements for a single IntPt
+            labels = self.elementLabels
+            #write in file as such
+            line1 = '"element (right):"'
+            #also indicate this in the filename
+            labelType = 'IntPt'
+        elif self.elementLabels is not None:
+            #we want to write the element labels
+            labels = self.elementLabels
+            #write in file as such
+            line1 = '"element (right):"'
+            #also indicate this in the filename, so there won't be conflicts
+            labelType = 'NODE'
+        elif self.nodeLabels is not None:
             #we want to write the node labels
             labels = self.nodeLabels
-            #we want to write in the file that it is node labels
+            #write in file as such
             line1 = '"node (right):"'
-            #we want to write this to the filename, so there won't be conflicts
-            type = 'ELEM'
-        elif self.nodeLabels is None:
-            labels = self.elementLabels
-            #we want to write in the file that it is element labels
-            line1 = '"element (right):"'
-            #we want to write this to the filename, so there won't be conflicts
-            type = 'NODE'
+            #also indicate this in the filename, so there won't be conflicts
+            labelType = 'ELEM'
         else:
             raise Exception("Labels are undefined!")
         
         #strip away file extension
         odbName = os.path.splitext(self.odbName)[0]
+
         #assign file name to save
-        saveFileName = (odbName + '_' + self.setName + '-' + type +
-                        + '_' + dataTitle + '.csv')
+        saveFileName = (odbName + '_' + self.setName + '-' + labelType +
+                        '_' + dataTitle + '.csv')
         #ensure filename is safe to write
         saveFileName = safe_filename(saveFileName)
 
@@ -211,10 +305,10 @@ class fieldVariable(object):
 
 class IntPtVariable(fieldVariable):
     """ An integration point variable whose results
-    are extrapolated to the nodes of a defined set.
+    could be extrapolated to the nodes of a defined set.
     
     Attributes:
-        odbName  = string name of ODB file/location
+        odbPath  = string name of ODB file/location
         dataName = string name of the data (e.g. 'MISES')
         setName = string of the requested node set
         
@@ -225,21 +319,31 @@ class IntPtVariable(fieldVariable):
                     depends on setting of dataName
         
     Attributes set by fetchNodalAverage():
-        runCompletion = list of frame values for abaqus run 
+        runCompletion = tuple of frame values for abaqus run 
                         runCompletion[0] corresponds to resultData[0,:], etc.
-        nodeLabels    = list of nodes where output is generated
+        nodeLabels    = tuple of nodes where output is generated
                         nodeLabels[0] cooresponds to resultData[:,0], etc.
-        resultData    = numpy float64 array of the actual field 
+        resultData    = numpy float64 array (rank-2) of the actual field 
                         output data (e.g. PEEQ, mises, etc). 
                         Rows correspond to frame values,
                         columns correspond to nodes.
     
     Attributes set by fetchElementAverage():
         runCompletion = see above
-        elementLabels = list of elements where output is generated
+        elementLabels = tuple of elements where output is generated
                         elemental analog to nodeLabels
                         elementLabels[0] corresponds to resultData[:,0], etc.
         resultData    = see above (except w.r.t. elements)
+
+    Attributes set by fetchIntPtData():
+        runCompletion = see above
+        intPtLabels   = tuple of integration point labels where output is generated
+                        labels are done by: elementLabels.intPtLabels
+                        for example, 10.3 would be the 3rd int point on element 10
+                        intPtLabels[0] corresponds to resultData[:,0], etc.
+        resultData    = numpy float64 array (rank-3) of the actual field output data 
+                        (e.g. PEEQ, mises, etc) at integration point locations
+                        Access is: resultData[frame,element,IntPt]
     """
     
     #
@@ -286,69 +390,138 @@ class IntPtVariable(fieldVariable):
         return
 
     #
+    # Name Mangled Methods
+    #
+    def __fetchElementLabels(self, myElemSet):
+        """ return a tuple of sorted element labels """
+        elementLabels = [e.label for e in myElemSet.elements[0]]
+        elementLabels.sort()
+        return tuple(elementLabels)
+    
+    def __fetchNodeLabels(self, myNodeSet):
+        """ returns a tuple of sorted node labels """
+        nodeLabels = [n.label for n in myNodeSet.nodes[0]]
+        nodeLabels.sort()
+        return tuple(nodeLabels)
+        
+    #
     # Methods
     #
-    def fetchNodalAverage(self):
-        """ fetch the integration point field output
-        for the desired node set. Since we are requesting IP
-        field output at the nodes, ABAQUS will extrapolate 
-        using basis functions. Furthermore, IP field variables 
-        are discontinuous at the nodal locations, so this function
-        performs an average to obtain a single output per node. 
-        Unfortunately, this means that the function will not work
-        at TIE constraints.
+    def fetchNodalExtrap(self):
+        """ fetch integration point field output at the node locations
+        (for the desired element set) using extrapolation techniques.
+        Since we are requesting IP field output at the nodes, 
+        ABAQUS will extrapolate using basis functions. This function
+        does NOT perform any averaging at all. The nodal values for 
+        each element are stored, according to the ABAQUS node 
+        numbering scheme.
         
         this method sets the following attributes:
             runCompletion
+            elementLabels
             nodeLabels
             resultData
         """
+        #open output database and obtain myElemSet
+        odb,myElemSet = self._open_odb_check_keys('ELEMENT')
         
-        #open the output database in read-only mode
-        if self.odbName.endswith('.odb'):
-            odb = openOdb(self.odbName, readOnly=True)
-        else:
-            odb = openOdb(self.odbName + '.odb', readOnly=True)
-
         #
-        # check if keyName and setName exist (Error Handling)
-        # and set them if they do.
+        # figure out how big the problem is
         #
-        try:
-            myNodeSet = odb.rootAssembly.nodeSets[self.setName]
-        except KeyError:
-            print '\n!! Assembly level node set named %s does' \
-                  'not exist in the output database %s !!\n\n' \
-                  % (self.setName, self.odbName)
-            odb.close()
-            raise Exception
+        
+        #number of elements in set:
+        numele = len(myElemSet.elements[0])
+        
+        #assuming all elements are the same, number of nodes per elem
+        nnpe = len(myElemSet.elements[0][0].connectivity)
+        
+        # obtain numframes
+        numframes = self._numframes(odb)
+        
+        #
+        # obtain element labels
+        #
+        elementLabels = self.__fetchElementLabels(myElemSet)
+        
+        #
+        # nodeLabels will essentially be the element connectivity
+        #
+        nodeLabels = numpy.zeros((numele,nnpe),dtype=int)
+        
+        for e in myElemSet.elements[0]:
+            nodeLabels[elementLabels.index(e.label),:] = e.connectivity
+            
+        #
+        # iterate through the STEPs and FRAMEs, saving the info as applicable
+        #
 
-        testStep = odb.steps.keys()[-1]
-        if odb.steps[testStep].frames[-1].fieldOutputs.has_key(self.keyName) == 0:
-            print '%s output request is not defined for' \
-                  'all (or any?) steps!' % (self.keyName)
-            odb.close()
-            raise Exception
+        #initialize
+        frameNumber   = int(-1)
+        runCompletion = []
+        resultData    = numpy.zeros((numframes,numele,nnpe),dtype=numpy.float64)
+        
+        #loop steps
+        for stepNumber,step in enumerate(odb.steps.values()):
+
+            #loop frames (step increments)
+            for frame in step.frames:       # cant enumerate frameNumber
+                frameNumber += 1
+                #obtain and save frameValue
+                #you can interpret this as completion percentage
+                runCompletion.append(frame.frameValue + stepNumber)
+
+                #obtain a subset of the field output (based on myElemSet)
+                #this subset will only contain keyName data
+                myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(
+                    position=ELEMENT_NODAL,region=myElemSet)
+                
+                #obtain all the data for this frame
+                for value in myFieldOutput.values:
+                    #element number is stored in value.elementLabel
+                    e      = value.elementLabel
+                    #this corresponds to an index of:
+                    eindex = elementLabels.index(e)
+                    
+                    #node point number is stored in value.nodeLabel
+                    n      = value.nodeLabel
+                    #this corresponds to an index of:
+                    nindex = numpy.where( nodeLabels[eindex,:] == n )[0][0]
+                    
+                    #nodal data itself is stored in value.(abqAttrib)
+                    resultData[frameNumber, eindex, nindex] = \
+                                numpy.float64( getattr(value, self.abqAttrib) )
+        
+        #set the proper attributes
+        self._runCompletion = tuple(runCompletion)
+        self._nodeLabels    = nodeLabels
+        self._elementLabels = elementLabels
+        self._resultData    = resultData
+        
+        #flag that this method has been executed
+        self.__methodFlag = 'fetchNodalData'
+        
+        #all data from the steps and frames has been collected!
+        #close output database
+        odb.close()
+        return
+        
+        
+    def fetchNodalAverage(self):
+
+        
+        #open output database and obtain myNodeSet
+        odb,myElemSet = self._open_odb_check_keys('NODE')
         
         #
         # figure out which nodes are in myNodeSet, and sort them
         #
-        nodeLabels = []
-        for n in myNodeSet.nodes[0]:
-            nodeLabels.append(n.label)
-        nodeLabels.sort()
-        nodeLabels = tuple(nodeLabels)
-        numnod = int(len(nodeLabels))
+        nodeLabels = self.__fetchNodeLabels(myNodeSet)
+        numnod = len(nodeLabels)
 
         #
-        # loop through STEPs and FRAMEs, obtaining total number of FRAMEs
+        # obtain numframes
         #
-        numframes = int(0)
-        #loop steps
-        for step in odb.steps.values():
-            #loop frames (step increments)
-            for frame in step.frames:
-                numframes += 1
+        numframes = self._numframes(odb)
 
         #
         # iterate through the STEPs and FRAMEs, saving the info as applicable
@@ -408,17 +581,103 @@ class IntPtVariable(fieldVariable):
                 #save frame values to result
                 resultData[frameNumber,:] = frameData[:,1]
 
-        #save attributes
-        #save lists as tuple for memory efficiency
+        #set the proper attributes
         self._runCompletion = tuple(runCompletion)
-        self._nodeLabels    = nodeLabels #already tuple
+        self._nodeLabels    = tuple(nodeLabels)
         self._resultData    = resultData
+        
+        #flag that this method has been executed
+        self.__methodFlag = 'fetchNodalAverage'
         
         #all data from the steps and frames has been collected!
         #close output database
         odb.close()
         return
+    
+    def fetchIntPtData(self):
+        """ fetch the ingegration point field output
+        for the desired element set. Return the values for
+        each integration point in each element in the set 
+        
+        this methods sets the following attributes:
+            runCompletion
+            intPtLabels
+            resultData
+        """
+        
+        #open output database and obtain myElemSet
+        odb,myElemSet = self._open_odb_check_keys('ELEMENT')
+        
+        #
+        # determine how big the problem is
+        #
+        
+        # figure out how many integration points there are (total)
+        testStep = odb.steps.keys()[-1]
+        testFrameData = odb.steps[testStep].frames[-1].fieldOutputs[self.keyName].getSubset(
+                            region=myElemSet,position=INTEGRATION_POINT)
+        numips = len(testFrameData.values) #there is a value for every int point in the region
 
+        
+        # figure out how many elements and IPs per element there are
+        numel = len(myElemSet.elements[0])   #num elements
+        nipe  = numips/numel                 #num intpt per elem
+        intPtLabels = tuple(range(1,nipe+1)) #list of all IP numbers
+        
+        # get a list of all elements in the set
+        elementLabels = self.__fetchElementLabels(myElemSet)
+        
+        # figure out how many frames there are
+        numframes = self._numframes(odb)
+
+        #
+        # iterate through the STEPs and FRAMEs, saving the info as applicable
+        #
+
+        #initialize
+        frameNumber   = int(-1)
+        runCompletion = []
+        resultData    = numpy.zeros((numframes,numel,nipe),dtype=numpy.float64)
+                
+        #loop steps
+        for stepNumber,step in enumerate(odb.steps.values()):
+
+            #loop frames (step increments)
+            for frame in step.frames:       # cant enumerate frameNumber
+                frameNumber += 1
+                #obtain and save frameValue
+                #you can interpret this as completion percentage
+                runCompletion.append(frame.frameValue + stepNumber)
+
+                #obtain a subset of the field output (based on myElemSet)
+                #this subset will only contain keyName data
+                myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(
+                    position=INTEGRATION_POINT,region=myElemSet)
+                
+                #obtain all the data for this frame
+                for value in myFieldOutput.values:
+                    #element number is stored in value.elementLabel
+                    e  = value.elementLabel
+                    #integration point number is stored in value.integrationPoint
+                    ip = value.integrationPoint
+                    #int point data itself is stored in value.(abqAttrib)
+                    resultData[frameNumber, elementLabels.index(e), ip - 1] = \
+                                numpy.float64( getattr(value, self.abqAttrib) )
+        
+        #set the proper attributes
+        self._runCompletion = tuple(runCompletion)
+        self._intPtLabels   = intPtLabels
+        self._elementLabels = elementLabels
+        self._resultData    = resultData
+        
+        #flag that this method has been executed
+        self.__methodFlag = 'fetchIntPtData'
+        
+        #all data from the steps and frames has been collected!
+        #close output database
+        odb.close()
+        return
+        
     def fetchElementAverage(self):
         """ fetch the integration point field output
         for the desired element set. Return an average
@@ -429,51 +688,20 @@ class IntPtVariable(fieldVariable):
             elementLabels
             resultData
         """
-        #open the output database in read-only mode
-        if self.odbName.endswith('.odb'):
-            odb = openOdb(self.odbName, readOnly=True)
-        else:
-            odb = openOdb(self.odbName + '.odb', readOnly=True)
-
-        #
-        # check if keyName and setName exist (Error Handling)
-        # and set them if they do.
-        #
-        try:
-            myElemSet = odb.rootAssembly.elementSets[self.setName]
-        except KeyError:
-            print '\n!! Assembly level element set named %s does' \
-                  'not exist in the output database %s !!\n\n' \
-                  % (self.setName, self.odbName)
-            odb.close()
-            raise Exception
-
-        testStep = odb.steps.keys()[-1]
-        if odb.steps[testStep].frames[-1].fieldOutputs.has_key(self.keyName) == 0:
-            print '%s output request is not defined for' \
-                  'all (or any?) steps!' % (self.keyName)
-            odb.close()
-            raise Exception
+        
+        #open output database and obtain myElemSet
+        odb,myElemSet = self._open_odb_check_keys('ELEMENT')
         
         #
         # figure out which elements are in myElemSet, and sort them
         #
-        elementLabels = []
-        for e in myElemSet.elements[0]: #for some reason, this is a 1-element tuple...??
-            elementLabels.append(e.label)
-        elementLabels.sort()
-        elementLabels = tuple(elementLabels)
+        elementLabels = self.__fetchElementLabels(myElemSet)
         numele = int(len(elementLabels))
 
         #
-        # loop through STEPs and FRAMEs, obtaining total number of FRAMEs
+        # obtain numframes
         #
-        numframes = int(0)
-        #loop steps
-        for step in odb.steps.values():
-            #loop frames (step increments)
-            for frame in step.frames:
-                numframes += 1
+        numframes = self._numframes(odb)
 
         #
         # iterate through the STEPs and FRAMEs, saving the info as applicable
@@ -533,11 +761,13 @@ class IntPtVariable(fieldVariable):
                 #save frame values to result
                 resultData[frameNumber,:] = frameData[:,1]
 
-        #save data
-        #save lists as tuple for memory efficiency
+        #set the proper attributes
         self._runCompletion = tuple(runCompletion)
-        self._elementLabels = elementLabels #already tuple
+        self._elementLabels = tuple(elementLabels)
         self._resultData    = resultData
+        
+        #flag that this method has been executed
+        self.__methodFlag = 'fetchElementAverage'
         
         #all data from the steps and frames has been collected!
         #close output database
@@ -546,7 +776,18 @@ class IntPtVariable(fieldVariable):
         
     def saveCSV(self, verbose=True):
         """ save a CSV file of data """
-        self._saveOdbFieldDataCSV(verbose=verbose)
+        if self.__methodFlag == 'fetchIntPtData':
+            for i in self.intPtLabels:
+                self._saveOdbFieldDataCSV(self.dataName + '_IP' + str(i),
+                                      self.resultData[:,:,i-1], verbose=verbose)
+        
+        elif self.__methodFlag == 'fetchNodalData':
+            numele,nnpe = self.nodeLabels.shape
+            for i in range(0,nnpe):
+                self._saveOdbFieldDataCSV(self.dataName + '_NOD' + str(i),
+                                      self.resultData[:,:,i], verbose=verbose)
+        else:
+            self._saveOdbFieldDataCSV(verbose=verbose)
         return
 
 
@@ -555,7 +796,7 @@ class NodalVariable(fieldVariable):
     A nodal variable whose results are obtained on the defined set 
     
     Attributes:
-        odbName  = string name of ODB file/location
+        odbPath  = string name of ODB file/location
         dataName = string name of the data (e.g. 'U')
         setName = string of the requested node set
     
@@ -574,13 +815,13 @@ class NodalVariable(fieldVariable):
     #
     # Attributes (object initialization)
     #
-    def __init__(self, odbName, dataName, setName):
+    def __init__(self, odbPath, dataName, setName):
         """ return object with desired attributes """
         
         # initialize field variable
-        fieldVariable.__init__(self, odbName, dataName, setName)
+        fieldVariable.__init__(self, odbPath, dataName, setName)
         #add new attribute
-        self._componentLabels = None
+        self.__componentLabels = None
         
         return
     
@@ -593,7 +834,7 @@ class NodalVariable(fieldVariable):
 
     @property
     def componentLabels(self):
-        return self._componentLabels
+        return self.__componentLabels
     
     #
     # Methods
@@ -601,39 +842,18 @@ class NodalVariable(fieldVariable):
     def fetchNodalOutput(self):
         """ obtains the nodal output for the defined set """
         
-        #open the output database in read-only mode
-        if self.odbName.endswith('.odb'):
-            odb = openOdb(self.odbName, readOnly=True)
-        else:
-            odb = openOdb(self.odbName + '.odb', readOnly=True)
-        
-        #
-        # check if keyName and setName exist (Error Handling):
-        #
-        try:
-            myNodeSet = odb.rootAssembly.nodeSets[self.setName]
-        except KeyError:
-            print '\n!! Assembly level node set named %s does' \
-                  'not exist in the output database %s !!\n\n' \
-                  % (self.setName, self.odbName)
-            odb.close()
-            raise KeyError
 
-        testStep = odb.steps.keys()[-1]
-        if odb.steps[testStep].frames[-1].fieldOutputs.has_key(self.keyName) == 0:
-            print '%s output request is not defined for' \
-                  'all (or any?) steps!' % (self.keyName)
-            odb.close()
-            raise KeyError
+        #open output database and obtain myElemSet
+        odb,myNodeSet = self._open_odb_check_keys('NODE')
         
         #
         # obtain the componentLabels so that we know what the values
         # in the ODB array mean. This will also be used to meaningfully
         # name the saved data
         #
+        testStep = odb.steps.keys()[-1]
         components = odb.steps[testStep].frames[0]. \
                      fieldOutputs[self.keyName].componentLabels
-        components = tuple(components)
         numdim = len(components)
         
         #
@@ -643,36 +863,29 @@ class NodalVariable(fieldVariable):
         for n in myNodeSet.nodes[0]:
             nodeLabels.append(n.label)
         nodeLabels.sort()
-        nodeLabels = tuple(nodeLabels)
         numnod = int(len(nodeLabels))
 
+        
         #
-        # loop through STEPs and FRAMEs, obtaining total number of FRAMEs
+        # obtain numframes
         #
-        numframes = int(0)
-        #loop steps
-        for step in odb.steps.values():
-            #loop frames (step increments)
-            for frame in step.frames:
-                numframes += 1
+        numframes = self._numframes(odb)
 
         #
         # iterate through the STEPs and FRAMEs, saving the info as applicable
         #
 
         #initialize
-        stepNumber    = int(-1)
         frameNumber   = int(-1)
         runCompletion = []
         resultData    = numpy.zeros( (numframes,numnod,numdim),
                                      dtype=numpy.float64 )
         
         #loop steps
-        for step in odb.steps.values():
-            stepNumber += 1
+        for stepNumber,step in enumerate(odb.steps.values()):
 
             #loop frames (step increments)
-            for frame in step.frames:
+            for frame in step.frames:       # can't enumerate frameNumber
                 frameNumber += 1
                 #obtain and save frameValue
                 #you can interpret this as completion percentage
@@ -713,12 +926,11 @@ class NodalVariable(fieldVariable):
         #close output database
         odb.close()
         
-        # save to self
-        # save lists as tuples for memory efficiency
+        #save to self
         self._runCompletion   = tuple(runCompletion)
-        self._nodeLabels      = nodeLabels
+        self._nodeLabels      = tuple(nodeLabels)
         self._resultData      = resultData
-        self._componentLabels = components
+        self._componentLabels = tuple(components)
         return
 
     def sumNodalOutput(self):
@@ -736,6 +948,7 @@ class NodalVariable(fieldVariable):
         for i in range(0,numdim):
             componentLabels.append('summed' + self.componentLabels[i])
         componentLabels = tuple(componentLabels)
+        self.componentLabels = componentLabels
         
         #initialize array
         resultData = numpy.zeros((numframes,1,numdim),dtype=numpy.float64)
@@ -748,9 +961,8 @@ class NodalVariable(fieldVariable):
         #save
         self._resultData = resultData
         self._nodeLabels = (-1,)
-        self._componentLabels = componentLabels
         return
-        
+    
     def avgNodalOutput(self):
         """
         averages the data across all nodes (but not frames).
@@ -780,8 +992,7 @@ class NodalVariable(fieldVariable):
         self._nodeLabels = (-1,)
         self._componentLabels = componentLabels
         return
-        
-
+    
     def saveCSV(self, verbose=True):
         """ save a CSV file of the data """
         for i in range(0,len(self.componentLabels)):
@@ -811,31 +1022,8 @@ class ElementVariable(fieldVariable):
     def fetchInitialElementVolume(self):
         """ obtain the initial (frame 0) EVOL """
         
-        #open the output database in read-only mode
-        if self.odbName.endswith('.odb'):
-            odb = openOdb(self.odbName, readOnly=True)
-        else:
-            odb = openOdb(self.odbName + '.odb', readOnly=True)
-
-        #
-        # check if keyName and setName exist (Error Handling)
-        # and set them if they do.
-        #
-        try:
-            myElemSet = odb.rootAssembly.elementSets[self.setName]
-        except KeyError:
-            print '\n!! Assembly level element set named %s does' \
-                  'not exist in the output database %s !!\n\n' \
-                  % (self.setName, self.odbName)
-            odb.close()
-            raise Exception
-
-        testStep = odb.steps.keys()[-1]
-        if odb.steps[testStep].frames[-1].fieldOutputs.has_key(self.keyName) == 0:
-            print '%s output request is not defined for' \
-                  'all (or any?) steps!' % (self.keyName)
-            odb.close()
-            raise Exception
+        #open output database and obtain myElemSet
+        odb,myElemSet = self._open_odb_check_keys('ELEMENT')
         
         #
         # figure out which elements are in myElemSet, and sort them
@@ -844,7 +1032,6 @@ class ElementVariable(fieldVariable):
         for e in myElemSet.elements[0]: #for some reason, this is a 1-element tuple...
             elementLabels.append(e.label)
         elementLabels.sort()
-        elementLabels = tuple(elementLabels)
         numele = int(len(elementLabels))
 
         #
@@ -873,8 +1060,7 @@ class ElementVariable(fieldVariable):
         resultData[0,:] = tempData
         
         #save to self
-        #save lists as tuple for memory efficiency
-        self._elementLabels = elementLabels
+        self._elementLabels = tuple(elementLabels)
         self._resultData    = resultData
         self._runCompletion = (0,)
         
