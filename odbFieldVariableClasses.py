@@ -317,6 +317,21 @@ class IntPtVariable(fieldVariable):
                     depends on setting of dataName
         abqAttrib = string name of data storage location
                     depends on setting of dataName
+    
+    Attributes set by fetchNodalExtrap():
+        runCompletion = tuple of frame values for abaqus run 
+                        runCompletion[i] corresponds to resultData[i,:,:], etc.
+        elementLabels = tuple of element numbers where output is generated
+                        elementLabels[e] corresponds to resultData[:,:,e]
+        nodeLabels    = numpy int array (rank-2) of the nodal connectivity for
+                        each element in elementLabels. So, nodeLabels[e,:] 
+                        cooresponds to the nodal connectivity of elementLabel[e].
+                        nodeLabels[e,n] corresponds to the n-th node of elementLabel[e],
+                        per the ABAQUS node numbering convention.
+        resultData    = numpy float64 array (rank-3) of the actual field output data 
+                        (e.g. PEEQ, mises, etc) at nodal point locations (obtained via
+                        ABAQUS extrapolation technique). 
+                        Access is: resultData[i,n,e]
         
     Attributes set by fetchNodalAverage():
         runCompletion = tuple of frame values for abaqus run 
@@ -332,18 +347,18 @@ class IntPtVariable(fieldVariable):
         runCompletion = see above
         elementLabels = tuple of elements where output is generated
                         elemental analog to nodeLabels
-                        elementLabels[0] corresponds to resultData[:,0], etc.
+                        elementLabels[e] corresponds to resultData[:,e]
         resultData    = see above (except w.r.t. elements)
 
     Attributes set by fetchIntPtData():
         runCompletion = see above
         intPtLabels   = tuple of integration point labels where output is generated
-                        labels are done by: elementLabels.intPtLabels
-                        for example, 10.3 would be the 3rd int point on element 10
-                        intPtLabels[0] corresponds to resultData[:,0], etc.
+                        intPtLabels[ip] corresponds to resultData[:,ip,:]
+        elementLabels = tuple of element labels where output is generated
+                        elementLabels[e] corresponds to resultData[:,:,e]
         resultData    = numpy float64 array (rank-3) of the actual field output data 
                         (e.g. PEEQ, mises, etc) at integration point locations
-                        Access is: resultData[frame,element,IntPt]
+                        Access is: resultData[i,ip,e]
     """
     
     #
@@ -458,7 +473,7 @@ class IntPtVariable(fieldVariable):
         #initialize
         frameNumber   = int(-1)
         runCompletion = []
-        resultData    = numpy.zeros((numframes,numele,nnpe),dtype=numpy.float64)
+        resultData    = numpy.zeros((numframes,nnpe,numele),dtype=numpy.float64)
         
         #loop steps
         for stepNumber,step in enumerate(odb.steps.values()):
@@ -488,7 +503,7 @@ class IntPtVariable(fieldVariable):
                     nindex = numpy.where( nodeLabels[eindex,:] == n )[0][0]
                     
                     #nodal data itself is stored in value.(abqAttrib)
-                    resultData[frameNumber, eindex, nindex] = \
+                    resultData[frameNumber, nindex, eindex] = \
                                 numpy.float64( getattr(value, self.abqAttrib) )
         
         #set the proper attributes
@@ -504,7 +519,6 @@ class IntPtVariable(fieldVariable):
         #close output database
         odb.close()
         return
-        
         
     def fetchNodalAverage(self):
 
@@ -637,7 +651,7 @@ class IntPtVariable(fieldVariable):
         #initialize
         frameNumber   = int(-1)
         runCompletion = []
-        resultData    = numpy.zeros((numframes,numel,nipe),dtype=numpy.float64)
+        resultData    = numpy.zeros((numframes,nipe,numel),dtype=numpy.float64)
                 
         #loop steps
         for stepNumber,step in enumerate(odb.steps.values()):
@@ -661,7 +675,7 @@ class IntPtVariable(fieldVariable):
                     #integration point number is stored in value.integrationPoint
                     ip = value.integrationPoint
                     #int point data itself is stored in value.(abqAttrib)
-                    resultData[frameNumber, elementLabels.index(e), ip - 1] = \
+                    resultData[frameNumber, ip - 1, elementLabels.index(e)] = \
                                 numpy.float64( getattr(value, self.abqAttrib) )
         
         #set the proper attributes
@@ -779,13 +793,13 @@ class IntPtVariable(fieldVariable):
         if self.__methodFlag == 'fetchIntPtData':
             for i in self.intPtLabels:
                 self._saveOdbFieldDataCSV(self.dataName + '_IP' + str(i),
-                                      self.resultData[:,:,i-1], verbose=verbose)
+                                      self.resultData[:,i-1,:], verbose=verbose)
         
         elif self.__methodFlag == 'fetchNodalData':
             numele,nnpe = self.nodeLabels.shape
             for i in range(0,nnpe):
                 self._saveOdbFieldDataCSV(self.dataName + '_NOD' + str(i),
-                                      self.resultData[:,:,i], verbose=verbose)
+                                      self.resultData[:,i,:], verbose=verbose)
         else:
             self._saveOdbFieldDataCSV(verbose=verbose)
         return
