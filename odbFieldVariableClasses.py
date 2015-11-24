@@ -226,18 +226,14 @@ class fieldVariable(object):
             dataTitle = self.dataName
         if dataSet is None:
             dataSet = self.resultData
-            
         #set which labels to write
         if self.intPtLabels is not None:
-            raise Exception("writing CSV for this data type is temporarily broken")
             #we want to write the element labels
             #because the array contains data for
             #all elements for a single IntPt
             labels = self.elementLabels
             #write in file as such
             line1 = '"element (right):"'
-            #also indicate this in the filename
-            labelType = 'IntPt'
         elif self.elementLabels is not None:
             #we want to write the element labels
             labels = self.elementLabels
