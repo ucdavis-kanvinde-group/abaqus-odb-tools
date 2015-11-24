@@ -199,7 +199,7 @@ class fieldVariable(object):
         
         return numframes
     
-    def _saveOdbFieldDataCSV(self, dataTitle=None, 
+    def _saveOdbFieldDataCSV(self, customName=None, dataTitle=None, 
                             dataSet=None, verbose=True):
         """
         saves an ODB data array to a CSV file
@@ -229,6 +229,7 @@ class fieldVariable(object):
             
         #set which labels to write
         if self.intPtLabels is not None:
+            raise Exception("writing CSV for this data type is temporarily broken")
             #we want to write the element labels
             #because the array contains data for
             #all elements for a single IntPt
@@ -242,15 +243,11 @@ class fieldVariable(object):
             labels = self.elementLabels
             #write in file as such
             line1 = '"element (right):"'
-            #also indicate this in the filename, so there won't be conflicts
-            labelType = 'NODE'
         elif self.nodeLabels is not None:
             #we want to write the node labels
             labels = self.nodeLabels
             #write in file as such
             line1 = '"node (right):"'
-            #also indicate this in the filename, so there won't be conflicts
-            labelType = 'ELEM'
         else:
             raise Exception("Labels are undefined!")
         
@@ -258,8 +255,11 @@ class fieldVariable(object):
         odbName = os.path.splitext(self.odbName)[0]
 
         #assign file name to save
-        saveFileName = (odbName + '_' + self.setName + '-' + labelType +
-                        '_' + dataTitle + '.csv')
+        if customName is None:
+            saveFileName = (odbName + '_' + self.setName + '_' + dataTitle + '.csv')
+        else:
+            saveFileName = customName
+
         #ensure filename is safe to write
         saveFileName = safe_filename(saveFileName)
 
@@ -848,7 +848,7 @@ class NodalVariable(fieldVariable):
 
     @property
     def componentLabels(self):
-        return self.__componentLabels
+        return self._componentLabels
     
     #
     # Methods
@@ -962,7 +962,6 @@ class NodalVariable(fieldVariable):
         for i in range(0,numdim):
             componentLabels.append('summed' + self.componentLabels[i])
         componentLabels = tuple(componentLabels)
-        self.componentLabels = componentLabels
         
         #initialize array
         resultData = numpy.zeros((numframes,1,numdim),dtype=numpy.float64)
@@ -975,6 +974,7 @@ class NodalVariable(fieldVariable):
         #save
         self._resultData = resultData
         self._nodeLabels = (-1,)
+        self._componentLabels = componentLabels
         return
     
     def avgNodalOutput(self):
