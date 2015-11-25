@@ -199,8 +199,8 @@ class fieldVariable(object):
         
         return numframes
     
-    def _saveOdbFieldDataCSV(self, customName=None, dataTitle=None, 
-                            dataSet=None, verbose=True):
+    def _saveOdbFieldDataCSV(self, dataTitle=None, dataSet=None, 
+                            verbose=True, customFileName=None):
         """
         saves an ODB data array to a CSV file
         dependencies: re, sys, os, numpy
@@ -226,6 +226,7 @@ class fieldVariable(object):
             dataTitle = self.dataName
         if dataSet is None:
             dataSet = self.resultData
+            
         #set which labels to write
         if self.intPtLabels is not None:
             #we want to write the element labels
@@ -247,14 +248,18 @@ class fieldVariable(object):
         else:
             raise Exception("Labels are undefined!")
         
-        #strip away file extension
-        odbName = os.path.splitext(self.odbName)[0]
 
         #assign file name to save
-        if customName is None:
+        if customFileName is None:
+            #custom name not requested, figure out our own name
+            
+            #strip away file extension of odb
+            odbName = os.path.splitext(self.odbName)[0]
+            
+            #define save file name
             saveFileName = (odbName + '_' + self.setName + '_' + dataTitle + '.csv')
         else:
-            saveFileName = customName
+            saveFileName = customFileName + '.csv'
 
         #ensure filename is safe to write
         saveFileName = safe_filename(saveFileName)
@@ -788,14 +793,14 @@ class IntPtVariable(fieldVariable):
         """ save a CSV file of data """
         if self.__methodFlag == 'fetchIntPtData':
             for i in self.intPtLabels:
-                self._saveOdbFieldDataCSV(self.dataName + '_IP' + str(i),
-                                      self.resultData[:,i-1,:], verbose=verbose)
+                self._saveOdbFieldDataCSV(dataTitle=(self.dataName + '_IP' + str(i)),
+                                      dataSet=self.resultData[:,i-1,:], verbose=verbose)
         
         elif self.__methodFlag == 'fetchNodalData':
             numele,nnpe = self.nodeLabels.shape
             for i in range(0,nnpe):
-                self._saveOdbFieldDataCSV(self.dataName + '_NOD' + str(i),
-                                      self.resultData[:,i,:], verbose=verbose)
+                self._saveOdbFieldDataCSV(dataTitle=(self.dataName + '_NOD' + str(i)),
+                                      dataSet=self.resultData[:,i,:], verbose=verbose)
         else:
             self._saveOdbFieldDataCSV(verbose=verbose)
         return
@@ -1006,8 +1011,8 @@ class NodalVariable(fieldVariable):
     def saveCSV(self, verbose=True):
         """ save a CSV file of the data """
         for i in range(0,len(self.componentLabels)):
-            self._saveOdbFieldDataCSV(self.componentLabels[i],
-                                      self.resultData[:,:,i], verbose=verbose)
+            self._saveOdbFieldDataCSV(dataTitle=self.componentLabels[i],
+                                      dataSet=self.resultData[:,:,i], verbose=verbose)
         return
 
 
@@ -1082,4 +1087,3 @@ class ElementVariable(fieldVariable):
         """ save CSV file of the data """
         self._saveOdbFieldDataCSV(verbose=verbose)
         return
-
