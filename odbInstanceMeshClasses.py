@@ -53,8 +53,11 @@ class InstanceMesh(object):
         """ create object with requested attributes """
         
         # set by input parameters
-        self.odbPath         = odbPath
-        self.instanceName    = instanceName.upper()
+        self.odbPath      = odbPath
+        self.instanceName = instanceName.upper()
+        
+        # this is set as a name-mangled attribute (see below)
+        self.exactKey = exactKey
         
         # set by methods (read-only)
         self._nodes       = None
@@ -62,10 +65,6 @@ class InstanceMesh(object):
         self._elements    = None
         self._elemConnect = None
         self._elemType    = None
-        
-        # this is set as a name-mangled attribute (see below)
-        self.exactKey = exactKey
-        
         return
     
     # properties for read-only attributes
@@ -121,11 +120,17 @@ class InstanceMesh(object):
         #
         # figure out what our instance dictionary key is
         #
+        
+        # initialize dict key
+        iKey = None
+        
+        # determine dict key
         if self.exactKey:
             # then the instance is exactly self.instanceName
             iKey = self.instanceName
         else:
             # then the instance is a partial match of self.instanceName
+            # pick the first partial match that we arrive at
             for k in odb.rootAssembly.instances.keys():
                 if self.instanceName in k:
                     iKey = k
@@ -135,14 +140,14 @@ class InstanceMesh(object):
         # define instance if it exists, otherwise error handle
         #
         try:
-            myInstance = odb.rootAssembly.instances[self.instanceName]
-        except KeyError:
+            myInstance = odb.rootAssembly.instances[iKey]
+        except:
             odb.close()
-            print "\n\n!! instance " + self.instanceName + \
+            print "\n\n!! instance " + iKey + \
                   " is not defined in the assembly !!\n\n"
             raise KeyError
         
-        #
+        # 
         # determine the size of the problem
         #
         nnod = len( myInstance.nodes )     #number of nodes

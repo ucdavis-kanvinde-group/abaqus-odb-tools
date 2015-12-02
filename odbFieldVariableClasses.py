@@ -525,7 +525,7 @@ class IntPtVariable(fieldVariable):
 
         
         #open output database and obtain myNodeSet
-        odb,myElemSet = self._open_odb_check_keys('NODE')
+        odb,myNodeSet = self._open_odb_check_keys('NODE')
         
         #
         # figure out which nodes are in myNodeSet, and sort them
