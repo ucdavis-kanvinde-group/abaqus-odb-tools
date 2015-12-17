@@ -4,7 +4,8 @@ UC Davis
 9/28/15
 
 File that contains a class for representing/retrieving 
-mesh information from Abaqus input files
+mesh information for an instance in the assembly of 
+an ABAQUS odb file.
 """
 
 #

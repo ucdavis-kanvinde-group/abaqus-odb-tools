@@ -5,6 +5,13 @@ UC Davis
 
 File that contains a class for representing/retrieving 
 mesh information from Abaqus input files
+
+be aware that nodal coordinates stored in the ABAQUS input file refer 
+to the ABAQUS Parts, NOT the ABAQUS instance... this means that the 
+coordinates correspond to locations in the part coordinate system, 
+not the assembly-level coordinate system (which is probably what you want).
+
+To retrieve the mesh for the INSTANCE, not the PART, see odbInstanceMeshClasses.py
 """
 
 #
