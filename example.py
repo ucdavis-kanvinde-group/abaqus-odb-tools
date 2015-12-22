@@ -6,6 +6,17 @@ UC Davis
 Example file, to show you how to use the abaqus-odb-tools classes
 """
 
+# first we must import the tools we want to use
+from odbFieldVariableClasses import *
+
+# the above only works if your files are in the same folder as the tools.
+# alternatively, you can keep the abaqus-odb-tools files in a different folder.
+# in that case, you would import it like this:
+import sys
+sys.path.append("C:\\path\\to\\abaqus-odb-tools")
+from odbFieldVariableClasses import *
+
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # for example, say I want to obtain the (average) nodal MISES
 # for nodes in a defined assembly node set:
