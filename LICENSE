@@ -1,24 +1,21 @@
-Copyright (c) 2015, Kanvinde Research Group at UC Davis
-Copyright (c) 2015, Vincente Pericoli
+Copyright (c) 2015-2016, The Regents of the University of California (The Regents)
+Copyright (c) 2015-2016, Vincente Pericoli
 All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+The Regents grants permission, without fee and without a written license agreement, for (a) use, 
+reproduction, modification, and distribution of this software and its documentation by educational, 
+research, and non-profit entities for noncommercial purposes only; and (b) use, reproduction and 
+modification of this software by other entities for internal purposes only. The above copyright 
+notice, this paragraph and the following three paragraphs must appear in all copies and modifications 
+of the software and/or documentation.
 
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
+Permission to incorporate this software into products for commercial distribution may be obtained 
+by contacting the University of California Office of Research and Graduate Studies.
 
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-* Neither the name of abaqus-odb-tools nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-* Redistributions of any form whatsoever must retain the following
-  acknowledgment: 'This product includes software developed at 
-  "UC Davis" (http://www.ucdavis.edu/).'
+This software program and documentation are copyrighted by The Regents of the University of California. 
+The Regents does not warrant that the operation of the program will be uninterrupted or error-free. The 
+end-user understands that the program was developed for research purposes and is advised not to rely 
+exclusively on the program for any reason.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -30,4 +27,3 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
