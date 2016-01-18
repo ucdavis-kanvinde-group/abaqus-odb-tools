@@ -710,8 +710,13 @@ class IntPtVariable(fieldVariable):
             runCompletion
             elementLabels
             resultData
+            
+        *** NOTE: 
+        this method still uses an old and slow averaging scheme.
+        needs to be updated to the new scheme... 
+        see fetchNodalAverage() for newer scheme.
         """
-        
+
         #open output database and obtain myElemSet
         odb,myElemSet = self._open_odb_check_keys('ELEMENT')
         
