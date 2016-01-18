@@ -109,7 +109,7 @@ class InstanceMesh(object):
         
 
     def fetchMesh(self):
-        """ obtain the mesh. assign self.NodesCoords and self.ElemConnect attributes """
+        """ obtain the mesh information """
         #
         # open the output database in read-only mode
         #

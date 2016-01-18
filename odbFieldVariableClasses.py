@@ -522,8 +522,15 @@ class IntPtVariable(fieldVariable):
         return
         
     def fetchNodalAverage(self):
-
+        """ fetch the average nodal point field output
+        for the desired node set. Return an average
+        for each node in the set.
         
+        this method sets the following attributes:
+            runCompletion
+            nodeLabels
+            resultData
+        """
         #open output database and obtain myNodeSet
         odb,myNodeSet = self._open_odb_check_keys('NODE')
         
@@ -532,11 +539,21 @@ class IntPtVariable(fieldVariable):
         #
         nodeLabels = self.__fetchNodeLabels(myNodeSet)
         numnod = len(nodeLabels)
-
+        #convert to array for logical indexing (required in averaging scheme)
+        nodeLabels = numpy.asarray(nodeLabels,dtype=int)
+        
+        #
+        # determine the total number of nodes in the instance where the set is defined on
+        #
+        i_numnod = len( odb.rootAssembly.instances[myNodeSet.instanceNames[0]].nodes )
+        
         #
         # obtain numframes
         #
         numframes = self._numframes(odb)
+        if numframes > 50:
+            print "warning: this make take several minutes\n"
+        
 
         #
         # iterate through the STEPs and FRAMEs, saving the info as applicable
@@ -548,6 +565,7 @@ class IntPtVariable(fieldVariable):
         runCompletion = []
         resultData    = numpy.zeros((numframes,numnod),dtype=numpy.float64)
                 
+        
         #loop steps
         for step in odb.steps.values():
             stepNumber += 1
@@ -555,46 +573,36 @@ class IntPtVariable(fieldVariable):
             #loop frames (step increments)
             for frame in step.frames:
                 frameNumber += 1
+                
                 #obtain and save frameValue
                 #you can interpret this as completion percentage
                 runCompletion.append(frame.frameValue + stepNumber)
 
-                #initialize frame array.
-                #this is used as temporary storage for 
-                #averaging nodal results in the current frame
-                frameData      = numpy.zeros((numnod,2),dtype=numpy.float64)
-                frameData[:,0] = numpy.float64(nodeLabels)
+                #initialize arrays.
+                #these are used as temporary storage for 
+                #averaging nodal results in the current frame.
+                frameData   = numpy.zeros((i_numnod,1),dtype=numpy.float64)
+                nValPerNode = numpy.zeros((i_numnod,1),dtype=numpy.float64)
                 
                 #obtain a subset of the field output (based on myNodeSet)
                 #this subset will only contain keyName data
                 myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(
                     position=ELEMENT_NODAL,region=myNodeSet)
                 
-                #obtain all the nodal data for this frame
-                tempNodes = [];
-                tempData  = [];
+                #loop through all data values for this frame
                 for value in myFieldOutput.values:
+                    #sum the data into frameData, while keeping track of the
+                    #number of sums with nValPerNode.
+                    
                     #node number is stored in value.nodeLabel
-                    tempNodes.append(value.nodeLabel)
                     #nodal data is stored in value.(abqAttrib)
-                    tempData.append(numpy.float64( 
-                                    getattr(value, self.abqAttrib) ))
-
-
-                #average the nodal values so that there is
-                #one field data value per node in the frame
-                for i in range(0,len(nodeLabels)):
-                    #for all node labels
-                    nodal_data = []
-                    for k in range(0,len(tempNodes)):
-                        if nodeLabels[i] == tempNodes[k]:
-                            #pick up all data belonging to node
-                            nodal_data.append(tempData[k])
-                    #save average to frameData
-                    frameData[i,1] = numpy.mean(nodal_data, dtype=numpy.float64)
-
-                #save frame values to result
-                resultData[frameNumber,:] = frameData[:,1]
+                    frameData[value.nodeLabel-1,0]   += getattr(value, self.abqAttrib)
+                    nValPerNode[value.nodeLabel-1,0] += 1.0
+                
+                #average the nodal values so that there is one field data value 
+                #per node in the frame, and save frame values to resultData.
+                #note that the default numpy array divide is element-wise (like ./ in MATLAB)
+                resultData[frameNumber,:] = frameData[nodeLabels-1,0] / nValPerNode[nodeLabels-1,0]
 
         #set the proper attributes
         self._runCompletion = tuple(runCompletion)
