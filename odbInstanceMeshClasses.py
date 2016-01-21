@@ -144,7 +144,7 @@ class InstanceMesh(object):
             myInstance = odb.rootAssembly.instances[iKey]
         except:
             odb.close()
-            print "\n\n!! instance " + iKey + \
+            print "\n\n!! instance " + str(iKey) + \
                   " is not defined in the assembly !!\n\n"
             raise KeyError
         
@@ -190,6 +190,7 @@ class InstanceMesh(object):
         self._elements    = elements
         self._elemConnect = elemConnect
         self._elemType    = elemType
+        odb.close()
         return
 
         

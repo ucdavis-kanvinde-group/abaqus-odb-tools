@@ -551,9 +551,6 @@ class IntPtVariable(fieldVariable):
         # obtain numframes
         #
         numframes = self._numframes(odb)
-        if numframes > 50:
-            print "warning: this make take several minutes\n"
-        
 
         #
         # iterate through the STEPs and FRAMEs, saving the info as applicable
@@ -950,15 +947,15 @@ class NodalVariable(fieldVariable):
                         if nodeLabels[i] == nodes[k]:
                             resultData[frameNumber,i,:] = frameData[k,:]
 
-        #all data from the steps and frames has been collected!
-        #close output database
-        odb.close()
-        
-        #save to self
+        #save to attributes
         self._runCompletion   = tuple(runCompletion)
         self._nodeLabels      = tuple(nodeLabels)
         self._resultData      = resultData
         self._componentLabels = tuple(components)
+        
+        #all data from the steps and frames has been collected!
+        #close output database
+        odb.close()
         return
 
     def sumNodalOutput(self):
