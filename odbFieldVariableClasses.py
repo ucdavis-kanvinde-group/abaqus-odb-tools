@@ -45,7 +45,7 @@ class fieldVariable(object):
         self._setName  = setName.upper()  # must be upper-case
 
         # these are set by methods
-        self._runCompletion = None
+        self._totalTime     = None
         self._nodeLabels    = None
         self._elementLabels = None
         self._intPtLabels   = None
@@ -56,8 +56,8 @@ class fieldVariable(object):
     # Getters to make output attributes read-only
     #
     @property
-    def runCompletion(self):
-        return self._runCompletion
+    def totalTime(self):
+        return self._totalTime
     
     @property
     def nodeLabels(self):
@@ -128,7 +128,7 @@ class fieldVariable(object):
     def reset(self):
         """ resets any results to None """
         print "\nWarning: instance is being reset\n"
-        self._runCompletion = None
+        self._totalTime     = None
         self._nodeLabels    = None
         self._elementLabels = None
         self._intPtLabels   = None
@@ -188,16 +188,21 @@ class fieldVariable(object):
     def _numframes(self, odb):
         """
         given an odb, loop through STEPs, obtaining
-        the total number of FRAMEs in the analysis
+        the total number of FRAMEs in the analysis.
+        
+        does not include redundant frames.
+        useful for preallocating numpy arrays.
         """
 
-        numframes = int(0)
-        #loop steps
+        totalTime = []
+        #loop steps and frames
         for step in odb.steps.values():
-            #frames are the number of increments in a step
-            numframes += len(step.frames)
+            for frame in step.frames:
+                time = step.totalTime + frame.frameValue
+                if time not in totalTime:
+                    totalTime.append(time)
         
-        return numframes
+        return len(totalTime)
     
     def _saveOdbFieldDataCSV(self, dataTitle=None, dataSet=None, 
                             verbose=True, customFileName=None):
@@ -206,16 +211,16 @@ class fieldVariable(object):
         dependencies: re, sys, os, numpy
 
         formatted so that each node (nodeLabels) is a column,
-        and each frame value (runCompletion) is a row. For example,
-        the file is saved so that runCompletion (the frame values) 
+        and each frame value (totalTime) is a row. For example,
+        the file is saved so that totalTime (the frame values) 
         itself is in the left-most column, and the nodeLabels are saved
         in the top-most row. Then, dataSet (can be anything... PEEQ, Mises,
-        Pressure, etc.) is saved to the right of runCompletion and below 
+        Pressure, etc.) is saved to the right of totalTime and below 
         nodeLabels. In this way, each column of dataSet should correspond to
         a specific node (or element, or integration point, or whatever you pass
         in as nodeLabels),
         and each row should correspond to a specific frame value (or whatever you pass
-        in as runCompletion).
+        in as totalTime).
         
         verbose is an optional input (default true) which defines where there will be
         a "verbose" output to the command window or not. If True, it will tell you
@@ -234,7 +239,7 @@ class fieldVariable(object):
             #all elements for a single IntPt
             labels = self.elementLabels
             #write in file as such
-            line1 = '"element (right):"'
+            line1  = '"element (right):"'
         elif self.elementLabels is not None:
             #we want to write the element labels
             labels = self.elementLabels
@@ -281,10 +286,10 @@ class fieldVariable(object):
         saveFile.write(line1)
         saveFile.write(line2)
 
-        #begin writing dataSet, prepend lines with runCompletion:
-        for i in range(0,len(self.runCompletion)):
+        #begin writing dataSet, prepend lines with totalTime:
+        for i in range(0,len(self.totalTime)):
             #for all frames
-            line = str(self.runCompletion[i])
+            line = str(self.totalTime[i])
 
             for k in range(0,len(labels)):
                 #for all labels (node or element)
@@ -320,8 +325,8 @@ class IntPtVariable(fieldVariable):
                     depends on setting of dataName
     
     Attributes set by fetchNodalExtrap():
-        runCompletion = tuple of frame values for abaqus run 
-                        runCompletion[i] corresponds to resultData[i,:,:], etc.
+        totalTime = tuple of frame values for abaqus run 
+                        totalTime[i] corresponds to resultData[i,:,:], etc.
         elementLabels = tuple of element numbers where output is generated
                         elementLabels[e] corresponds to resultData[:,:,e]
         nodeLabels    = numpy int array (rank-2) of the nodal connectivity for
@@ -335,8 +340,8 @@ class IntPtVariable(fieldVariable):
                         Access is: resultData[i,n,e]
         
     Attributes set by fetchNodalAverage():
-        runCompletion = tuple of frame values for abaqus run 
-                        runCompletion[0] corresponds to resultData[0,:], etc.
+        totalTime = tuple of frame values for abaqus run 
+                        totalTime[0] corresponds to resultData[0,:], etc.
         nodeLabels    = tuple of nodes where output is generated
                         nodeLabels[0] cooresponds to resultData[:,0], etc.
         resultData    = numpy float64 array (rank-2) of the actual field 
@@ -345,14 +350,14 @@ class IntPtVariable(fieldVariable):
                         columns correspond to nodes.
     
     Attributes set by fetchElementAverage():
-        runCompletion = see above
+        totalTime = see above
         elementLabels = tuple of elements where output is generated
                         elemental analog to nodeLabels
                         elementLabels[e] corresponds to resultData[:,e]
         resultData    = see above (except w.r.t. elements)
 
     Attributes set by fetchIntPtData():
-        runCompletion = see above
+        totalTime = see above
         intPtLabels   = tuple of integration point labels where output is generated
                         intPtLabels[ip] corresponds to resultData[:,ip,:]
         elementLabels = tuple of element labels where output is generated
@@ -433,7 +438,7 @@ class IntPtVariable(fieldVariable):
         numbering scheme.
         
         this method sets the following attributes:
-            runCompletion
+            totalTime
             elementLabels
             nodeLabels
             resultData
@@ -472,19 +477,23 @@ class IntPtVariable(fieldVariable):
         #
 
         #initialize
-        frameNumber   = int(-1)
-        runCompletion = []
-        resultData    = numpy.zeros((numframes,nnpe,numele),dtype=numpy.float64)
+        totalTime   = []
+        resultData  = numpy.zeros((numframes,nnpe,numele),dtype=numpy.float64)
         
         #loop steps
-        for stepNumber,step in enumerate(odb.steps.values()):
+        for step in odb.steps.values():
 
             #loop frames (step increments)
-            for frame in step.frames:       # cant enumerate frameNumber
-                frameNumber += 1
-                #obtain and save frameValue
-                #you can interpret this as completion percentage
-                runCompletion.append(frame.frameValue + stepNumber)
+            for frame in step.frames:
+                #calculate the "time" of this specific frame
+                frameTime = step.totalTime + frame.frameValue
+                #check to see if this is a duplicate frame (happens between steps)
+                if frameTime in totalTime:
+                    #this is a duplicate. continue to next frame
+                    continue
+                else:
+                    #this is not a duplicate; save to totalTime
+                    totalTime.append(frameTime)
 
                 #obtain a subset of the field output (based on myElemSet)
                 #this subset will only contain keyName data
@@ -504,11 +513,11 @@ class IntPtVariable(fieldVariable):
                     nindex = numpy.where( nodeLabels[eindex,:] == n )[0][0]
                     
                     #nodal data itself is stored in value.(abqAttrib)
-                    resultData[frameNumber, nindex, eindex] = \
+                    resultData[len(totalTime)-1, nindex, eindex] = \
                                 numpy.float64( getattr(value, self.abqAttrib) )
         
         #set the proper attributes
-        self._runCompletion = tuple(runCompletion)
+        self._totalTime     = tuple(totalTime)
         self._nodeLabels    = nodeLabels
         self._elementLabels = elementLabels
         self._resultData    = resultData
@@ -527,7 +536,7 @@ class IntPtVariable(fieldVariable):
         for each node in the set.
         
         this method sets the following attributes:
-            runCompletion
+            totalTime
             nodeLabels
             resultData
         """
@@ -557,23 +566,24 @@ class IntPtVariable(fieldVariable):
         #
 
         #initialize
-        stepNumber    = int(-1)
-        frameNumber   = int(-1)
-        runCompletion = []
-        resultData    = numpy.zeros((numframes,numnod),dtype=numpy.float64)
+        totalTime  = []
+        resultData = numpy.zeros((numframes,numnod),dtype=numpy.float64)
                 
         
         #loop steps
         for step in odb.steps.values():
-            stepNumber += 1
 
             #loop frames (step increments)
             for frame in step.frames:
-                frameNumber += 1
-                
-                #obtain and save frameValue
-                #you can interpret this as completion percentage
-                runCompletion.append(frame.frameValue + stepNumber)
+                #calculate the "time" of this specific frame
+                frameTime = step.totalTime + frame.frameValue
+                #check to see if this is a duplicate frame (happens between steps)
+                if frameTime in totalTime:
+                    #this is a duplicate. continue to next frame
+                    continue
+                else:
+                    #this is not a duplicate; save to totalTime
+                    totalTime.append(frameTime)
 
                 #initialize arrays.
                 #these are used as temporary storage for 
@@ -599,12 +609,12 @@ class IntPtVariable(fieldVariable):
                 #average the nodal values so that there is one field data value 
                 #per node in the frame, and save frame values to resultData.
                 #note that the default numpy array divide is element-wise (like ./ in MATLAB)
-                resultData[frameNumber,:] = frameData[nodeLabels-1,0] / nValPerNode[nodeLabels-1,0]
+                resultData[len(totalTime)-1,:] = frameData[nodeLabels-1,0] / nValPerNode[nodeLabels-1,0]
 
         #set the proper attributes
-        self._runCompletion = tuple(runCompletion)
-        self._nodeLabels    = tuple(nodeLabels)
-        self._resultData    = resultData
+        self._totalTime  = tuple(totalTime)
+        self._nodeLabels = tuple(nodeLabels)
+        self._resultData = resultData
         
         #flag that this method has been executed
         self.__methodFlag = 'fetchNodalAverage'
@@ -620,7 +630,7 @@ class IntPtVariable(fieldVariable):
         each integration point in each element in the set 
         
         this methods sets the following attributes:
-            runCompletion
+            totalTime
             intPtLabels
             resultData
         """
@@ -655,19 +665,23 @@ class IntPtVariable(fieldVariable):
         #
 
         #initialize
-        frameNumber   = int(-1)
-        runCompletion = []
-        resultData    = numpy.zeros((numframes,nipe,numel),dtype=numpy.float64)
+        totalTime  = []
+        resultData = numpy.zeros((numframes,nipe,numel),dtype=numpy.float64)
                 
         #loop steps
-        for stepNumber,step in enumerate(odb.steps.values()):
+        for step in odb.steps.values():
 
             #loop frames (step increments)
-            for frame in step.frames:       # cant enumerate frameNumber
-                frameNumber += 1
-                #obtain and save frameValue
-                #you can interpret this as completion percentage
-                runCompletion.append(frame.frameValue + stepNumber)
+            for frame in step.frames:
+                #calculate the "time" of this specific frame
+                frameTime = step.totalTime + frame.frameValue
+                #check to see if this is a duplicate frame (happens between steps)
+                if frameTime in totalTime:
+                    #this is a duplicate. continue to next frame
+                    continue
+                else:
+                    #this is not a duplicate; save to totalTime
+                    totalTime.append(frameTime)
 
                 #obtain a subset of the field output (based on myElemSet)
                 #this subset will only contain keyName data
@@ -681,11 +695,11 @@ class IntPtVariable(fieldVariable):
                     #integration point number is stored in value.integrationPoint
                     ip = value.integrationPoint
                     #int point data itself is stored in value.(abqAttrib)
-                    resultData[frameNumber, ip - 1, elementLabels.index(e)] = \
+                    resultData[len(totalTime)-1, ip - 1, elementLabels.index(e)] = \
                                 numpy.float64( getattr(value, self.abqAttrib) )
         
         #set the proper attributes
-        self._runCompletion = tuple(runCompletion)
+        self._totalTime     = tuple(totalTime)
         self._intPtLabels   = intPtLabels
         self._elementLabels = elementLabels
         self._resultData    = resultData
@@ -704,7 +718,7 @@ class IntPtVariable(fieldVariable):
         for each element in the set.
         
         this method sets the following attributes:
-            runCompletion
+            totalTime
             elementLabels
             resultData
             
@@ -733,21 +747,23 @@ class IntPtVariable(fieldVariable):
         #
 
         #initialize
-        stepNumber    = int(-1)
-        frameNumber   = int(-1)
-        runCompletion = []
-        resultData    = numpy.zeros((numframes,numele),dtype=numpy.float64)
+        totalTime  = []
+        resultData = numpy.zeros((numframes,numele),dtype=numpy.float64)
                 
         #loop steps
         for step in odb.steps.values():
-            stepNumber += 1
 
             #loop frames (step increments)
             for frame in step.frames:
-                frameNumber += 1
-                #obtain and save frameValue
-                #you can interpret this as completion percentage
-                runCompletion.append(frame.frameValue + stepNumber)
+                #calculate the "time" of this specific frame
+                frameTime = step.totalTime + frame.frameValue
+                #check to see if this is a duplicate frame (happens between steps)
+                if frameTime in totalTime:
+                    #this is a duplicate. continue to next frame
+                    continue
+                else:
+                    #this is not a duplicate; save to totalTime
+                    totalTime.append(frameTime)
 
                 #initialize frame array.
                 #this is used as temporary storage for 
@@ -784,10 +800,10 @@ class IntPtVariable(fieldVariable):
                     frameData[i,1] = numpy.mean(ip_data, dtype=numpy.float64)
 
                 #save frame values to result
-                resultData[frameNumber,:] = frameData[:,1]
+                resultData[len(totalTime)-1,:] = frameData[:,1]
 
         #set the proper attributes
-        self._runCompletion = tuple(runCompletion)
+        self._totalTime = tuple(totalTime)
         self._elementLabels = tuple(elementLabels)
         self._resultData    = resultData
         
@@ -826,8 +842,8 @@ class NodalVariable(fieldVariable):
         setName = string of the requested node set
     
     Attributes set by fetchNodalAverage():
-        runCompletion = list of frame values for abaqus run 
-                        runCompletion[0] corresponds to resultData[0,:,:], etc.
+        totalTime = list of frame values for abaqus run 
+                        totalTime[0] corresponds to resultData[0,:,:], etc.
         nodeLabels    = list of nodes where output is generated
                         nodeLabels[0] cooresponds to resultData[:,0,:], etc.
         componentLabels = list of components where output is generated
@@ -901,20 +917,24 @@ class NodalVariable(fieldVariable):
         #
 
         #initialize
-        frameNumber   = int(-1)
-        runCompletion = []
+        totalTime = []
         resultData    = numpy.zeros( (numframes,numnod,numdim),
                                      dtype=numpy.float64 )
         
         #loop steps
-        for stepNumber,step in enumerate(odb.steps.values()):
+        for step in odb.steps.values():
 
             #loop frames (step increments)
-            for frame in step.frames:       # can't enumerate frameNumber
-                frameNumber += 1
-                #obtain and save frameValue
-                #you can interpret this as completion percentage
-                runCompletion.append(frame.frameValue + stepNumber)
+            for frame in step.frames:
+                #calculate the "time" of this specific frame
+                frameTime = step.totalTime + frame.frameValue
+                #check to see if this is a duplicate frame (happens between steps)
+                if frameTime in totalTime:
+                    #this is a duplicate. continue to next frame
+                    continue
+                else:
+                    #this is not a duplicate; save to totalTime
+                    totalTime.append(frameTime)
 
                 #obtain a subset of the field output (based on myNodeSet)
                 #this subset will only contain keyName data
@@ -945,10 +965,10 @@ class NodalVariable(fieldVariable):
                 for i in range(0,numnod):
                     for k in range(0,len(nodes)):
                         if nodeLabels[i] == nodes[k]:
-                            resultData[frameNumber,i,:] = frameData[k,:]
+                            resultData[len(totalTime)-1,i,:] = frameData[k,:]
 
         #save to attributes
-        self._runCompletion   = tuple(runCompletion)
+        self._totalTime   = tuple(totalTime)
         self._nodeLabels      = tuple(nodeLabels)
         self._resultData      = resultData
         self._componentLabels = tuple(components)
@@ -965,7 +985,7 @@ class NodalVariable(fieldVariable):
         total reaction force 'RF' for the node set.
         """
         #determine size of problem
-        numframes = len(self.runCompletion)
+        numframes = len(self.totalTime)
         numdim    = len(self.componentLabels)
         
         #rename componentLabels to indicate they are summed
@@ -995,7 +1015,7 @@ class NodalVariable(fieldVariable):
         average displacement of a surface (node set)
         """
         #determine size of problem
-        numframes = len(self.runCompletion)
+        numframes = len(self.totalTime)
         numdim    = len(self.componentLabels)
         
         #rename componentLabels to indicate they are summed
@@ -1087,7 +1107,7 @@ class ElementVariable(fieldVariable):
         #save to self
         self._elementLabels = tuple(elementLabels)
         self._resultData    = resultData
-        self._runCompletion = (0,)
+        self._totalTime     = (0,)
         
         #close output database and return
         odb.close()
