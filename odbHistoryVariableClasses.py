@@ -4,8 +4,6 @@ UC Davis
 10/08/2015
 
 Classes for representing Abaqus ODB history variables.
-
-verified to give accurate results on 10/14/2015
 """
 
 
@@ -18,7 +16,6 @@ from abaqusConstants import *
 import numpy
 import sys
 import re
-import string
 from myFileOperations import *
 
 #
@@ -28,6 +25,7 @@ from myFileOperations import *
 class CrackVariable(object):
     """ 
     a crack variable (currently only J-integral supported)
+    verified to give accurate results on 10/14/2015
     
     Attributes:
     
@@ -40,12 +38,12 @@ class CrackVariable(object):
     #
     # Attributes (+ object initialization)
     #
-    def __init__(self, odbName, stepName, crackName):
+    def __init__(self, odbPath, stepName, crackName):
         """ return object with the desired attributes """
         
         # these attributes have properties (below) to protect the 
         # object from becoming unstable or broken
-        self._odbName   = odbName
+        self._odbPath   = odbPath
         self._stepName  = stepName
         self._crackName = crackName.upper()
     
@@ -63,15 +61,15 @@ class CrackVariable(object):
     # Getters and Setters for definition
     #
     @property
-    def odbName(self):
-        return self._odbName
+    def odbPath(self):
+        return self._odbPath
     
-    @odbName.setter
-    def odbName(self,s):
+    @odbPath.setter
+    def odbPath(self,s):
         if not isinstance(s,str):
             raise TypeError('Must be a string!')
-        self._odbName = s
-        #changing the odbName will reset any results  
+        self._odbPath = s
+        #changing the odbPath will reset any results  
         #since they are not valid for a new ODB
         self.reset()
         return
@@ -144,14 +142,17 @@ class CrackVariable(object):
     def fetchJintegral(self):
         """ obtains the J-integral values for the crack """
         
-        #open the output database. must be in same directory
-        odb = openOdb(self.odbName,readOnly=True)
+        # open the output database in read-only mode
+        if self.odbPath.endswith('.odb'):
+            odb = openOdb(self.odbPath, readOnly=True)
+        else:
+            odb = openOdb(self.odbPath + '.odb', readOnly=True)
         
-        #define description string (per ABAQUS, and for user-info)
+        # define description string (per ABAQUS, and for user-info)
         description = 'J-integral'
         
-        #define history region to analyze. kind of a hack-ey work-around 
-        #for if the ODB has been converted from a previous ABAQUS version
+        # define history region to analyze. kind of a hack-ey work-around 
+        # for if the ODB has been converted from a previous ABAQUS version
         try:
             # this is the histKey for a converted database
             histKey = 'ElementSet . PIBATCH'
@@ -164,57 +165,56 @@ class CrackVariable(object):
         #
         # obtain all of the relevant FRAME values
         #
-        runCompletion = []
         for key in region_history.keys():
             if description in region_history[key].description:
-                #implies this key is a J-integral
-                for row in region_history[key].data:
-                    runCompletion.append(row[0])
+                # implies this key is a J-integral
+                # obtain all the frameValues that it is defined on
+                runCompletion = numpy.asarray(region_history[key].data,dtype=float)
+                runCompletion = runCompletion[:,0]
                 break
         
-        numframes = len(runCompletion)
+        # number of total frameValues
+        numFrames = len(runCompletion)
         
         #
-        # obtain number of requested contours
+        # obtain number of requested contours for the specified crack
         #
-        numcontours = int(0)
+        numContours = int(0)
         for key in region_history.keys():
             if (description    in region_history[key].description) and \
                (self.crackName in region_history[key].name):
-                #implies this key is a J-integral of the requested crack
-                numcontours += 1
+                # implies this key is a J-integral belonging to the specified crack
+                numContours += 1
                 
         #
         # loop through history output, obtaining data
         #
         
-        #initialize
-        contourIndex   = int(-1)
+        # initialize
         contourLabels  = []
         contourNumbers = []
-        resultData = numpy.zeros((numframes,numcontours),dtype=numpy.float64)
+        resultData = numpy.zeros((numFrames,numContours),dtype=numpy.float64)
         
         for key in region_history.keys():
             if (description    in region_history[key].description) and \
                (self.crackName in region_history[key].name):
-                #implies this key is a J-integral of the requested crack
-                contourIndex += 1
+                # implies this key is a J-integral of the requested crack
                 
-                #save contour name and number
-                name = string.split(region_history[key].name,'_')
+                # save contour name and number
+                name    = region_history[key].name.split('_')
+                contour = int(name[-1])
                 contourLabels.append(name[-2] + '_' + name[-1])
                 contourNumbers.append(name[-1])
                 
                 #save contour data
-                data = region_history[key].data
-                for i in range(0,len(data)):
-                    resultData[i,contourIndex] = data[i][1]
+                data = numpy.asarray(region_history[key].data, dtype=numpy.float64)
+                resultData[:,contour-1] = data[:,1]
 
         # all relevant data for the step has been captured!
         self._description    = description
         self._runCompletion  = runCompletion
-        self._contourLabels  = contourLabels
-        self._contourNumbers = contourNumbers
+        self._contourLabels  = tuple(contourLabels)
+        self._contourNumbers = tuple(contourNumbers)
         self._resultData     = resultData
         return
         
@@ -225,7 +225,7 @@ class CrackVariable(object):
         formatted so that each contour (contourLabels) is a column,
         and each frame value (runCompletion) is a row
         """
-        odbName = os.path.splitext(self.odbName)[0]
+        odbName = os.path.splitext(self.odbPath)[0]
         saveFileName = (odbName + '_' + self.description +
                         '_' + self.crackName + '.csv')
         #ensure filename is safe to write
