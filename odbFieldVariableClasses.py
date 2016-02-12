@@ -178,8 +178,8 @@ class fieldVariable(object):
         #
         testStep = odb.steps.keys()[-1]
         if odb.steps[testStep].frames[-1].fieldOutputs.has_key(self.keyName) == 0:
-            print '%s output request is not defined for' \
-                  'all (or any?) steps!' % (self.keyName)
+            print '\n\n%s output request is not defined for ' \
+                  'all (or any?) steps!\n\n' % (self.keyName)
             odb.close()
             raise Exception
         
@@ -1018,10 +1018,10 @@ class NodalVariable(fieldVariable):
         numframes = len(self.totalTime)
         numdim    = len(self.componentLabels)
         
-        #rename componentLabels to indicate they are summed
+        #rename componentLabels to indicate they are averaged
         componentLabels = []
         for i in range(0,numdim):
-            componentLabels.append('summed' + self.componentLabels[i])
+            componentLabels.append('average' + self.componentLabels[i])
         componentLabels = tuple(componentLabels)
         
         #initialize array
