@@ -447,30 +447,32 @@ class IntPtVariable(fieldVariable):
         odb,myElemSet = self._open_odb_check_keys('ELEMENT')
         
         #
-        # figure out how big the problem is
+        # figure out details on how big the problem is
         #
         
         #number of elements in set:
         numele = len(myElemSet.elements[0])
-        
         #assuming all elements are the same, number of nodes per elem
         nnpe = len(myElemSet.elements[0][0].connectivity)
-        
         # obtain numframes
         numframes = self._numframes(odb)
+        # determine the total number of elements and nodes in the instance where the set is defined on
+        i_numele = len( odb.rootAssembly.instances[myElemSet.instanceNames[0]].elements )
+        i_numnod = len( odb.rootAssembly.instances[myElemSet.instanceNames[0]].nodes )
         
         #
         # obtain element labels
         #
         elementLabels = self.__fetchElementLabels(myElemSet)
+        # set as array for logical indexing
+        elementLabels = numpy.asarray(elementLabels, dtype=int)
         
         #
-        # nodeLabels will essentially be the element connectivity
+        # nodeLabels will essentially be the element connectivity of the set
         #
         nodeLabels = numpy.zeros((numele,nnpe),dtype=int)
-        
         for e in myElemSet.elements[0]:
-            nodeLabels[elementLabels.index(e.label),:] = e.connectivity
+            nodeLabels[numpy.where(elementLabels==e.label)[0][0],:] = e.connectivity
             
         #
         # iterate through the STEPs and FRAMEs, saving the info as applicable
@@ -494,27 +496,31 @@ class IntPtVariable(fieldVariable):
                 else:
                     #this is not a duplicate; save to totalTime
                     totalTime.append(frameTime)
-
-                #obtain a subset of the field output (based on myElemSet)
-                #this subset will only contain keyName data
+                
+                # allocate temporary storage arrays for data.
+                frameData = numpy.zeros((i_numnod,i_numele),dtype=numpy.float64)
+                
+                # obtain a subset of the field output (based on myElemSet)
+                # this subset will only contain keyName data
                 myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(
                     position=ELEMENT_NODAL,region=myElemSet)
                 
-                #obtain all the data for this frame
+                # obtain all the data for this frame
                 for value in myFieldOutput.values:
-                    #element number is stored in value.elementLabel
-                    e      = value.elementLabel
-                    #this corresponds to an index of:
-                    eindex = elementLabels.index(e)
+                    # element number is stored in value.elementLabel
+                    e = value.elementLabel
+                    # node number is stored in value.nodeLabel
+                    n = value.nodeLabel
+                    # set the data into temporary storage array
+                    frameData[n-1,e-1] = numpy.float64( getattr(value, self.abqAttrib) )
                     
-                    #node point number is stored in value.nodeLabel
-                    n      = value.nodeLabel
-                    #this corresponds to an index of:
-                    nindex = numpy.where( nodeLabels[eindex,:] == n )[0][0]
-                    
-                    #nodal data itself is stored in value.(abqAttrib)
-                    resultData[len(totalTime)-1, nindex, eindex] = \
-                                numpy.float64( getattr(value, self.abqAttrib) )
+                # save to resultData.
+                # even though this seems like a strange way to go about it,
+                # cProfile has shown this is significantly more efficient compared to 
+                # inserting directly into resultData[] with tuple.index() indexing 
+                # (i.e. without using a temporary frameData at all).
+                for i,e in enumerate(elementLabels):
+                    resultData[len(totalTime)-1,:,i] = frameData[nodeLabels[i,:]-1,e-1]
         
         #set the proper attributes
         self._totalTime     = tuple(totalTime)
@@ -639,7 +645,7 @@ class IntPtVariable(fieldVariable):
         odb,myElemSet = self._open_odb_check_keys('ELEMENT')
         
         #
-        # determine how big the problem is
+        # figure out details on how big the problem is
         #
         
         # figure out how many integration points there are (total)
@@ -647,17 +653,21 @@ class IntPtVariable(fieldVariable):
         testFrameData = odb.steps[testStep].frames[-1].fieldOutputs[self.keyName].getSubset(
                             region=myElemSet,position=INTEGRATION_POINT)
         numips = len(testFrameData.values) #there is a value for every int point in the region
-
         
-        # figure out how many elements and IPs per element there are
+        # determine the total number of elements in the instance where the set is defined on
+        i_numel = len( odb.rootAssembly.instances[myElemSet.instanceNames[0]].elements )
+        
+        # figure out how many elements and IPs per element there are in the set itself
         numel = len(myElemSet.elements[0])   #num elements
-        nipe  = numips/numel                 #num intpt per elem
+        nipe  = numips/numel                 #num integration pts per elem
         intPtLabels = tuple(range(1,nipe+1)) #list of all IP numbers
         
         # get a list of all elements in the set
         elementLabels = self.__fetchElementLabels(myElemSet)
+        # convert to array so we can use logical indexing
+        elementLabels = numpy.asarray(elementLabels,dtype=int)
         
-        # figure out how many frames there are
+        # determine out how many frames there are
         numframes = self._numframes(odb)
 
         #
@@ -683,6 +693,9 @@ class IntPtVariable(fieldVariable):
                     #this is not a duplicate; save to totalTime
                     totalTime.append(frameTime)
 
+                # create temporary storage array
+                frameData = numpy.zeros((nipe,i_numel),dtype=numpy.float64)
+                
                 #obtain a subset of the field output (based on myElemSet)
                 #this subset will only contain keyName data
                 myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(
@@ -694,9 +707,11 @@ class IntPtVariable(fieldVariable):
                     e  = value.elementLabel
                     #integration point number is stored in value.integrationPoint
                     ip = value.integrationPoint
-                    #int point data itself is stored in value.(abqAttrib)
-                    resultData[len(totalTime)-1, ip - 1, elementLabels.index(e)] = \
-                                numpy.float64( getattr(value, self.abqAttrib) )
+                    # set the data into temporary storage array
+                    frameData[ip-1,e-1] = numpy.float64( getattr(value, self.abqAttrib) )
+                
+                # save to resultData
+                resultData[len(totalTime)-1,:,:] = frameData[:,elementLabels-1]
         
         #set the proper attributes
         self._totalTime     = tuple(totalTime)
