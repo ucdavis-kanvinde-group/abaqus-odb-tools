@@ -443,63 +443,56 @@ class IntPtVariable(fieldVariable):
             nodeLabels
             resultData
         """
-        #open output database and obtain myElemSet
+        # open output database and obtain myElemSet
         odb,myElemSet = self._open_odb_check_keys('ELEMENT')
         
         #
         # figure out details on how big the problem is
         #
         
-        #number of elements in set:
+        # number of elements in set:
         numele = len(myElemSet.elements[0])
-        #assuming all elements are the same, number of nodes per elem
+        # assuming all elements are the same, number of nodes per elem
         nnpe = len(myElemSet.elements[0][0].connectivity)
         # obtain numframes
         numframes = self._numframes(odb)
-        # determine the total number of elements and nodes in the instance where the set is defined on
-        i_numele = len( odb.rootAssembly.instances[myElemSet.instanceNames[0]].elements )
-        i_numnod = len( odb.rootAssembly.instances[myElemSet.instanceNames[0]].nodes )
         
         #
         # obtain element labels
         #
         elementLabels = self.__fetchElementLabels(myElemSet)
-        # set as array for logical indexing
-        elementLabels = numpy.asarray(elementLabels, dtype=int)
         
         #
-        # nodeLabels will essentially be the element connectivity of the set
+        # nodeLabels will essentially be the element connectivity
         #
         nodeLabels = numpy.zeros((numele,nnpe),dtype=int)
+        
         for e in myElemSet.elements[0]:
-            nodeLabels[numpy.where(elementLabels==e.label)[0][0],:] = e.connectivity
+            nodeLabels[elementLabels.index(e.label),:] = e.connectivity
             
         #
         # iterate through the STEPs and FRAMEs, saving the info as applicable
         #
 
-        #initialize
+        # initialize
         totalTime   = []
         resultData  = numpy.zeros((numframes,nnpe,numele),dtype=numpy.float64)
         
-        #loop steps
+        # loop steps
         for step in odb.steps.values():
 
-            #loop frames (step increments)
+            # loop frames (step increments)
             for frame in step.frames:
-                #calculate the "time" of this specific frame
+                # calculate the "time" of this specific frame
                 frameTime = step.totalTime + frame.frameValue
-                #check to see if this is a duplicate frame (happens between steps)
+                # check to see if this is a duplicate frame (happens between steps)
                 if frameTime in totalTime:
-                    #this is a duplicate. continue to next frame
+                    # this is a duplicate. continue to next frame
                     continue
                 else:
-                    #this is not a duplicate; save to totalTime
+                    # this is not a duplicate; save to totalTime
                     totalTime.append(frameTime)
-                
-                # allocate temporary storage arrays for data.
-                frameData = numpy.zeros((i_numnod,i_numele),dtype=numpy.float64)
-                
+
                 # obtain a subset of the field output (based on myElemSet)
                 # this subset will only contain keyName data
                 myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(
@@ -508,31 +501,35 @@ class IntPtVariable(fieldVariable):
                 # obtain all the data for this frame
                 for value in myFieldOutput.values:
                     # element number is stored in value.elementLabel
-                    e = value.elementLabel
-                    # node number is stored in value.nodeLabel
-                    n = value.nodeLabel
-                    # set the data into temporary storage array
-                    frameData[n-1,e-1] = numpy.float64( getattr(value, self.abqAttrib) )
+                    e      = value.elementLabel
+                    # this corresponds to an index of:
+                    eindex = elementLabels.index(e)
                     
-                # save to resultData.
-                # even though this seems like a strange way to go about it,
-                # cProfile has shown this is significantly more efficient compared to 
-                # inserting directly into resultData[] with tuple.index() indexing 
-                # (i.e. without using a temporary frameData at all).
-                for i,e in enumerate(elementLabels):
-                    resultData[len(totalTime)-1,:,i] = frameData[nodeLabels[i,:]-1,e-1]
+                    # node point number is stored in value.nodeLabel
+                    n      = value.nodeLabel
+                    # this corresponds to an index of:
+                    nindex = numpy.where( nodeLabels[eindex,:] == n )[0][0]
+                    
+                    # insert the corresponding data directly to resultData.
+					# unfortunately, a similar technique employed in fetchIntPtData
+					# cannot be used, due to the way that Abaqus saves this type of
+					# extrapolated data, and the massive memory hit to preallocating
+					# an instance nnod x nele array. If SciPy is included in future
+					# releases of Abaqus, sparse matrices could be used.
+                    resultData[len(totalTime)-1, nindex, eindex] = \
+                                numpy.float64( getattr(value, self.abqAttrib) )
         
-        #set the proper attributes
+        # set the proper attributes
         self._totalTime     = tuple(totalTime)
         self._nodeLabels    = nodeLabels
         self._elementLabels = elementLabels
         self._resultData    = resultData
         
-        #flag that this method has been executed
-        self.__methodFlag = 'fetchNodalData'
+        # flag that this method has been executed
+        self.__methodFlag = 'fetchNodalExtrap'
         
-        #all data from the steps and frames has been collected!
-        #close output database
+        # all data from the steps and frames has been collected!
+        # close output database
         odb.close()
         return
         
