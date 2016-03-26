@@ -511,11 +511,11 @@ class IntPtVariable(fieldVariable):
                     nindex = numpy.where( nodeLabels[eindex,:] == n )[0][0]
                     
                     # insert the corresponding data directly to resultData.
-					# unfortunately, a similar technique employed in fetchIntPtData
-					# cannot be used, due to the way that Abaqus saves this type of
-					# extrapolated data, and the massive memory hit to preallocating
-					# an instance nnod x nele array. If SciPy is included in future
-					# releases of Abaqus, sparse matrices could be used.
+                    # unfortunately, a similar technique employed in fetchIntPtData
+                    # cannot be used, due to the way that Abaqus saves this type of
+                    # extrapolated data, and the massive memory hit to preallocating
+                    # an instance nnod x nele array. If SciPy is included in future
+                    # releases of Abaqus, sparse matrices could be used.
                     resultData[len(totalTime)-1, nindex, eindex] = \
                                 numpy.float64( getattr(value, self.abqAttrib) )
         
@@ -910,14 +910,19 @@ class NodalVariable(fieldVariable):
         numdim = len(components)
         
         #
-        # figure out which nodes are in myNodeSet, and sort them
+        # determine size of the problem
         #
-        nodeLabels = []
-        for n in myNodeSet.nodes[0]:
-            nodeLabels.append(n.label)
+        
+        # figure out which nodes are in myNodeSet, and sort them
+        nodeLabels = [n.label for n in myNodeSet.nodes[0]]
         nodeLabels.sort()
+        # number of nodes in myNodeSet
         numnod = int(len(nodeLabels))
-
+        # to use nodeLabels in logical indexing, convert to numpy array
+        nodeLabels = numpy.asarray(nodeLabels,dtype=int)
+        
+        # determine the total number of nodes in the instance where the set is defined on
+        i_numnod = len( odb.rootAssembly.instances[myNodeSet.instanceNames[0]].nodes )
         
         #
         # obtain numframes
@@ -929,9 +934,8 @@ class NodalVariable(fieldVariable):
         #
 
         #initialize
-        totalTime = []
-        resultData    = numpy.zeros( (numframes,numnod,numdim),
-                                     dtype=numpy.float64 )
+        totalTime  = []
+        resultData = numpy.zeros( (numframes,numnod,numdim), dtype=numpy.float64 )
         
         #loop steps
         for step in odb.steps.values():
@@ -950,37 +954,30 @@ class NodalVariable(fieldVariable):
 
                 #obtain a subset of the field output (based on myNodeSet)
                 #this subset will only contain keyName data
-                myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(
-                                region=myNodeSet)
+                myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(region=myNodeSet)
                 
-                #initialize an array to temporarily store data for this frame.
-                #necessary since we cannot be sure what order the nodes are in
-                frameData = numpy.zeros((numnod,numdim),dtype=numpy.float64)
+                # initialize an array to temporarily store data for this frame.
+                # necessary since we cannot be sure what order the nodes are in.
+                # preallocate full i_numnod size for convenience of indexing.
+                frameData = numpy.zeros((i_numnod,numdim),dtype=numpy.float64)
                 
                 #retrieve all the nodal data for this frame
-                nodes = []
                 for value in myFieldOutput.values:
                     #for all values in the frame
-                    nodes.append( value.nodeLabel )
-                    for i in range(0,numdim):
-                        #for all defined dimensions
-                        try:
-                            #analysis is single precision, so data is stored
-                            #as a vector in value.data
-                            frameData[len(nodes)-1,i] = value.data[i]
-                        except:
-                            #analysis is double precision, so data is stored
-                            #as a vector in value.dataDouble
-                            frameData[len(nodes)-1,i] = value.dataDouble[i]
+                    try:
+                        #analysis is single precision, so data is stored
+                        #as a vector in value.data
+                        frameData[value.nodeLabel-1,:] = value.data
+                    except:
+                        #analysis is double precision, so data is stored
+                        #as a vector in value.dataDouble
+                        frameData[value.nodeLabel-1,:] = value.dataDouble
 
-                #save frame values to result
-                for i in range(0,numnod):
-                    for k in range(0,len(nodes)):
-                        if nodeLabels[i] == nodes[k]:
-                            resultData[len(totalTime)-1,i,:] = frameData[k,:]
+                # save frameData to resultData
+                resultData[len(totalTime)-1,:,:] = frameData[nodeLabels-1,:]
 
         #save to attributes
-        self._totalTime   = tuple(totalTime)
+        self._totalTime       = tuple(totalTime)
         self._nodeLabels      = tuple(nodeLabels)
         self._resultData      = resultData
         self._componentLabels = tuple(components)
@@ -1062,6 +1059,10 @@ class ElementVariable(fieldVariable):
     """ 
     any variable intrinsic to a whole element itself (like volume)
     which is not represented through nodes or integration points
+    
+    currently, this is a bit hack-y. Instead of nice general functions,
+    I've defined functions specifically for EVOL. This is purely for 
+    convenience, since that's all I need.
     """
     
     @property
@@ -1122,6 +1123,87 @@ class ElementVariable(fieldVariable):
         self._totalTime     = (0,)
         
         #close output database and return
+        odb.close()
+        return
+        
+    def fetchElementVolume(self):
+        """ obtain the EVOL for all frames """
+        
+        # open output database and obtain myElemSet
+        odb,myElemSet = self._open_odb_check_keys('ELEMENT')
+        
+        #
+        # determine size of the problem
+        #
+        
+        # figure out which elements are in myElemSet, and sort them
+        elementLabels = [e.label for e in myElemSet.elements[0]]
+        elementLabels.sort()
+        # number of elems in myElemSet
+        numele = int(len(elementLabels))
+        # to use elemLabels in logical indexing, convert to numpy array
+        elementLabels = numpy.asarray(elementLabels,dtype=int)
+        
+        # determine the total number of nodes in the instance where the set is defined on
+        i_numele = len( odb.rootAssembly.instances[myElemSet.instanceNames[0]].elements )
+        
+        #
+        # obtain numframes
+        #
+        numframes = self._numframes(odb)
+        
+        #
+        # iterate through the STEPs and FRAMEs, saving the info as applicable
+        #
+        
+        # initialize
+        totalTime  = []
+        resultData = numpy.zeros( (numframes,numele), dtype=numpy.float64 )
+        
+        # loop steps
+        for step in odb.steps.values():
+
+            # loop frames (step increments)
+            for frame in step.frames:
+                # calculate the "time" of this specific frame
+                frameTime = step.totalTime + frame.frameValue
+                # check to see if this is a duplicate frame (happens between steps)
+                if frameTime in totalTime:
+                    # this is a duplicate. continue to next frame
+                    continue
+                else:
+                    # this is not a duplicate; save to totalTime
+                    totalTime.append(frameTime)
+                
+                # obtain a subset of the field output (based on myNodeSet)
+                # this subset will only contain keyName data
+                myFieldOutput = frame.fieldOutputs[self.keyName].getSubset(region=myElemSet)
+
+                # initialize an array to temporarily store data for this frame.
+                # necessary since we cannot be sure what order the elements are in.
+                # preallocate full i_numele size for convenience of indexing.
+                frameData = numpy.zeros((1,i_numele), dtype=numpy.float64)
+                
+                # retrieve all the element data for this frame
+                for value in myFieldOutput.values:
+                    # for all values in the frame
+                    # element number is stored in value.elementLabel
+                    try:
+                        # analysis is single precision, so data is stored in value.data
+                        frameData[0,value.elementLabel-1] = numpy.float64(value.data)
+                    except:
+                        # analysis is double precision
+                        frameData[0,value.elementLabel-1] = value.dataDouble
+                
+                # save frameData to resultData
+                resultData[len(totalTime)-1,:] = frameData[0,elementLabels-1]
+                
+        # save to self
+        self._elementLabels = tuple(elementLabels)
+        self._resultData    = resultData
+        self._totalTime     = tuple(totalTime)
+        
+        # close output database and return
         odb.close()
         return
 
