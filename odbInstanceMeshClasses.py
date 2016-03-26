@@ -36,13 +36,13 @@ class InstanceMesh(object):
                        determines if partial matching is used
 
     Attributes set by fetchMesh():
-        Nodes       = numpy array vector of all node numbers
-        NodesCoords = numpy array of the nodal coordinates
-                      (e.g. NodesCoords[0] is the coordinates of node 1)
-        Elements    = numpy array vector of all element numbers
-        ElemConnect = numpy array of the nodal connectivity for an element
-                      (e.g. ElemConnect[0] is the connectivity of element 1)
-        ElemType    = string of the type of element (e.g. 'CAX8R')
+        nodes       = numpy array vector of all node numbers
+        nodesCoords = numpy array of the nodal coordinates
+                      (e.g. nodesCoords[0] is the coordinates of node 1)
+        elements    = numpy array vector of all element numbers
+        elemConnect = numpy array of the nodal connectivity for an element
+                      (e.g. elemConnect[0] is the connectivity of element 1)
+        elemType    = string of the type of element (e.g. 'CAX8R')
                       assumes that all elements are the same type. invalid otherwise.
         
     Methods:
