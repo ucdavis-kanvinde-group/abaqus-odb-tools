@@ -26,7 +26,7 @@ def check_delete(name, verbose=True):
             print "\nold file deleted"
             print "saving new \"%s\"\n" % (name)
         except:
-            print "\nno file found, saving new file \"%s\"\n" % (name)
+            print "\nno file found \"%s\"\n" % (name)
     else:
         try:
             os.remove(name)
