@@ -157,7 +157,7 @@ class CrackVariable(object):
             # this is the histKey for a converted database
             histKey = 'ElementSet . PIBATCH'
             region_history = odb.steps[self.stepName].historyRegions[histKey].historyOutputs
-        except:
+        except KeyError:
             # this is the default histKey for CAE 6.14
             histKey = 'ElementSet . ALL ELEMENTS'
             region_history = odb.steps[self.stepName].historyRegions[histKey].historyOutputs

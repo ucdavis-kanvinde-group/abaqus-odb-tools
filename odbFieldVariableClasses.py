@@ -21,10 +21,7 @@ Contained in this file:
 #
 from odbAccess import *
 from abaqusConstants import *
-import numpy
-import sys
-import re
-import os
+import numpy, sys, re, os
 from myFileOperations import *
 
 #
@@ -166,12 +163,13 @@ class fieldVariable(object):
                 print "\n\n!! unknown setType defined !!\n\n"
                 raise Exception
         except KeyError:
-            #the requested set does not exist...
-            print '\n!! Assembly level %s set named %s does' \
-                  'not exist in the output database %s !!\n\n' \
-                    % (setType, self.setName, self.odbPath)
+            # close odb file
             odb.close()
-            raise Exception
+            # alert user the requested set does not exist...
+            msg = 'Assembly level %s set named %s does' \
+                  'not exist in the output database %s !' \
+                    % (setType, self.setName, self.odbPath)
+            raise KeyError(msg)
         
         #
         # check if keyName is a requested output
@@ -968,7 +966,7 @@ class NodalVariable(fieldVariable):
                         #analysis is single precision, so data is stored
                         #as a vector in value.data
                         frameData[value.nodeLabel-1,:] = value.data
-                    except:
+                    except OdbError:
                         #analysis is double precision, so data is stored
                         #as a vector in value.dataDouble
                         frameData[value.nodeLabel-1,:] = value.dataDouble
@@ -1110,7 +1108,7 @@ class ElementVariable(fieldVariable):
             # EVOL is stored in data or dataDouble
             try:
                 tempData.append(numpy.float64( value.data ))
-            except:
+            except OdbError:
                 tempData.append(numpy.float64( value.dataDouble ))
 
         #save data as a numpy array
@@ -1191,7 +1189,7 @@ class ElementVariable(fieldVariable):
                     try:
                         # analysis is single precision, so data is stored in value.data
                         frameData[0,value.elementLabel-1] = numpy.float64(value.data)
-                    except:
+                    except OdbError:
                         # analysis is double precision
                         frameData[0,value.elementLabel-1] = value.dataDouble
                 

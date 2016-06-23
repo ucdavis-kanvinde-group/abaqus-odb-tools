@@ -142,11 +142,10 @@ class InstanceMesh(object):
         #
         try:
             myInstance = odb.rootAssembly.instances[iKey]
-        except:
+        except KeyError:
             odb.close()
-            print "\n\n!! instance " + str(iKey) + \
-                  " is not defined in the assembly !!\n\n"
-            raise KeyError
+            msg = "instance " + str(iKey) + " is not defined in the assembly !\n"
+            raise KeyError(msg)
         
         # 
         # determine the size of the problem
